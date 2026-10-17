@@ -56,7 +56,7 @@ class GeminiClient:
                     log.warning("Switching to fallback model %s.", self.models[0])
         raise GeminiQuotaError(
             "All configured Gemini models have hit their free daily limit (or are unavailable). "
-            "Limits reset at midnight Pacific time; then run 'python main.py write'."
+            "Limits reset at midnight Pacific time; then click Continue writing on the dashboard."
         )
 
     def check_model(self, model: str) -> None:

@@ -22,7 +22,8 @@ SETTINGS_FORM = [
         ("filters.max_duration_minutes", "Maximum length (minutes)", "float", "Skips long streams and podcasts."),
         ("filters.exclude_title_words", "Skip titles containing", "lines", "One word or phrase per line."),
         ("filters.exclude_channels", "Skip channels", "lines", "Channel names or IDs, one per line."),
-        ("filters.max_videos_per_run", "New videos per run", "int", "The highest viewed are kept."),
+        ("filters.max_videos_per_run", "Default number to find", "int",
+         "Prefills the 'How many' box. The most viewed matches are kept."),
     ]),
     ("Transcripts", "", [
         ("transcripts.languages", "Languages", "lines", "Preferred transcript languages in order, like en."),

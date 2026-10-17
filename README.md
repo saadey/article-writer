@@ -7,13 +7,18 @@ your drafts organised until you publish them by hand.
 It runs on your own computer and opens in your browser. Everything (projects, settings, prompts,
 transcripts, articles) is stored in a local database. Your API keys stay in a `.env` file on your machine.
 
-**What it does for each video:**
+**How it works:**
 
-1. **Finds** popular videos for your keywords (YouTube Data API) and filters them by views, age and length
-2. **Saves the transcript**
-3. **Writes an article** following your instructions, with 3 title options, editor notes, and claims to fact check
-4. **Writes image prompts** for a header/thumbnail and in-article images
-5. **Tracks it** from "in progress" to "ready to publish" to "published"
+1. **Find**: you choose how many videos (1, 10, 100...). It searches your keywords, filters by views, age and
+   length, and lists the matches with their stats: views, likes, likes per 1,000 views, comments, channel
+   and subscribers, length, upload date. No transcripts or AI yet, so this is quick and cheap.
+2. **Pick**: tick the videos worth writing about. Dismiss the rest (they won't be found again).
+3. **Write**: only the videos you picked get a transcript, an article (following your instructions, with
+   3 title options, editor notes and claims to fact check) and image prompts. One video at a time, so
+   each one shows up as ready as soon as it's done.
+4. **Publish**: copy the article into Substack, then mark it as published.
+
+(Dislike counts aren't available: YouTube removed them from its public API in 2021.)
 
 ---
 
@@ -68,7 +73,8 @@ Google may use prompts to improve its products, which is fine for public YouTube
 
 | Page | What it's for |
 |------|---------------|
-| **Dashboard** | Counts, **Run everything**, smaller tasks (continue writing, find videos only, retry failed, preview search), live progress with a Stop button |
+| **Dashboard** | **Find videos** (choose how many), counts, **Continue writing** (videos already started), **Retry failed**, live progress with a Stop button |
+| **Found** | Search results with their stats, sortable (most viewed, most liked, best like ratio, biggest channels, newest...). Tick videos and click **Write selected**, or **Dismiss** them |
 | **Drafts** | Ready to publish / In progress / Published / Failed lists. Download a list as a .zip |
 | **Draft page** | Read and edit the article, **Copy article for Substack** (keeps headings and formatting), pick a title option, check flagged claims, copy image prompts, see the transcript, rewrite, mark as published |
 | **Settings** | Keywords, filters (views, age, length), transcript languages, Gemini model and backups, article length, image prompt count and aspect ratio |
@@ -77,19 +83,22 @@ Google may use prompts to improve its products, which is fine for public YouTube
 | **Projects** | One project per niche, each with its own settings, prompts and drafts. Create, copy, rename, delete |
 | **API keys** | YouTube and Gemini keys (plus an optional transcript proxy), shared by all projects |
 
-**Publishing workflow:**
+**Workflow:**
 
-1. Open **Drafts → Ready to publish** and pick a draft.
-2. On **Titles & notes**, choose a title and fact check the flagged claims.
-3. On **Image prompts**, copy each prompt into your image tool (ChatGPT, Gemini, Midjourney...).
-4. Click **Copy article for Substack**, paste into a new Substack post, add the title, subtitle and images.
-5. Click **Mark as published**.
+1. **Dashboard → Find videos**, choosing how many. When it finishes you're taken to the **Found** page.
+2. Tick the promising ones and click **Write selected**. Watch progress in the blue bar; each takes a few minutes.
+3. Open **Drafts → Ready to publish** and pick a draft.
+4. On **Titles & notes**, choose a title and fact check the flagged claims.
+5. On **Image prompts**, copy each prompt into your image tool (ChatGPT, Gemini, Midjourney...).
+6. Click **Copy article for Substack**, paste into a new Substack post, add the title, subtitle and images.
+7. Click **Mark as published**.
 
 Always read and edit before publishing: the AI can get facts wrong, and the ideas come from other creators.
 
-**How re-runs work:** each video moves through `transcript → article → images → published`. Running again
-only does new work: finished videos are never processed twice, failed ones wait for **Retry failed**, and
-anything a stopped or out-of-quota run didn't finish stays queued.
+**How re-runs work:** each video moves through `found → transcript → article → images → published`.
+Searching again only lists videos you haven't seen (found, dismissed or written ones are skipped). Finished
+videos are never processed twice, failed ones wait for **Retry failed**, and anything a stopped or
+out-of-quota task didn't finish stays queued for **Continue writing**.
 
 ## 5. Command line (optional)
 
@@ -97,8 +106,10 @@ Everything the app does is also available from the terminal, which is handy for 
 
 ```bash
 python main.py projects                          # list projects
-python main.py -p "Personal Finance" run         # all steps for one project
-python main.py -p "Personal Finance" run --dry-run
+python main.py -p "Personal Finance" find -n 10  # find 10 new videos for review
+python main.py -p "Personal Finance" found       # list them with stats and IDs
+python main.py -p "Personal Finance" process VIDEO_ID VIDEO_ID   # write the ones you pick
+python main.py -p "Personal Finance" run         # fully automatic, no review: find + write all
 python main.py -p "Personal Finance" write       # continue: articles + image prompts
 python main.py -p "Personal Finance" retry
 python main.py -p "Personal Finance" status

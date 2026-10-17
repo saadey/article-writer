@@ -69,12 +69,54 @@ class Pipeline:
 
     # ---- steps 1-2 -----------------------------------------------------------
 
-    def discover(self) -> list:
+    def discover(self, limit: Optional[int] = None) -> list:
         log.info("Project: %s | %d keyword(s)", self.settings.niche_name, len(self.settings.search.keywords))
         client = YouTubeClient(self.settings.require_youtube_key())
-        videos = discover_videos(self.settings, client, self.db)
+        videos = discover_videos(self.settings, client, self.db, limit)
         self.tally["found"] += len(videos)
         return videos
+
+    def find(self, limit: Optional[int] = None) -> list:
+        """Search only: save new videos with their stats for you to review. No transcripts, no Gemini."""
+        videos = self.discover(limit)
+        for video in videos:
+            self.db.save_found(self.project_id, video.to_dict())
+        if videos:
+            log.info("Saved %d video(s) to the Found list. Pick the ones to write about there.", len(videos))
+        return videos
+
+    def process(self, row_ids: list) -> None:
+        """Take each chosen video all the way: transcript, article, image prompts. One video at a
+        time, so each finished one shows up as ready while the rest are still being written."""
+        rows = [r for r in (self.db.video(i) for i in row_ids) if r and r["project_id"] == self.project_id]
+        if not rows:
+            log.info("No videos selected.")
+            return
+        api = None
+        for index, row in enumerate(rows, 1):
+            self.check_cancel()
+            if index > 1 and self.settings.transcripts.delay_seconds:
+                self.sleep(self.settings.transcripts.delay_seconds)
+            log.info("=== Video %d of %d: %s", index, len(rows), row["title"])
+            if row["stage"] == "published" or (row["stage"], row["status"]) == ("images", "done"):
+                log.info("  already finished, skipping")
+                continue
+            if not row["transcript_text"]:
+                api = api or make_transcript_api(self.settings.transcript_proxy_url)
+                video = VideoInfo.from_dict(loads(row["metadata_json"], {}))
+                outcome = self._fetch_one(api, video)
+                if outcome == "blocked":
+                    return
+                if outcome != "ok":
+                    continue
+            for stage in ("article", "images"):
+                row = self.db.video(row["id"])
+                if stage == "article" and row["article_body"] and row["stage"] != "transcript":
+                    continue  # article already written
+                if not self.generate(stage, [row]):
+                    return
+                if self.db.video(row["id"])["status"] == "failed":
+                    break  # don't build image prompts on top of a failed article
 
     def fetch_transcripts(self, videos: list) -> None:
         if not videos:
@@ -87,28 +129,35 @@ class Pipeline:
             if index > 1 and self.settings.transcripts.delay_seconds:
                 self.sleep(self.settings.transcripts.delay_seconds)
             log.info("[%d/%d] %s", index, len(videos), video.title)
-            row_id = self.db.mark_pending(self.project_id, video.to_dict())
-            try:
-                text, segments, info = get_transcript(api, video.video_id, self.settings.transcripts)
-            except TranscriptBlockedError as exc:
-                self.db.mark_failed(row_id, str(exc))
-                self.tally["failed"] += 1
-                self.tally["stopped"] += 1
-                log.error("%s", exc)
-                log.error("Stopping early. Remaining videos were not attempted.")
+            if self._fetch_one(api, video) == "blocked":
                 return
-            except TranscriptError as exc:
-                self.db.mark_failed(row_id, str(exc))
-                self.tally["failed"] += 1
-                log.warning("  failed: %s", exc)
-            except Exception as exc:  # unexpected bug or network error: record it and keep going
-                self.db.mark_failed(row_id, f"Unexpected error: {type(exc).__name__}: {exc}")
-                self.tally["failed"] += 1
-                log.exception("  unexpected error")
-            else:
-                self.db.save_transcript(row_id, text, segments, info)
-                self.tally["transcripts"] += 1
-                log.info("  saved transcript (%d words)", info["word_count"])
+
+    def _fetch_one(self, api, video: VideoInfo) -> str:
+        """Fetch and save one transcript. Returns 'ok', 'failed', or 'blocked' (stop the run)."""
+        row_id = self.db.mark_pending(self.project_id, video.to_dict())
+        try:
+            text, segments, info = get_transcript(api, video.video_id, self.settings.transcripts)
+        except TranscriptBlockedError as exc:
+            self.db.mark_failed(row_id, str(exc))
+            self.tally["failed"] += 1
+            self.tally["stopped"] += 1
+            log.error("%s", exc)
+            log.error("Stopping early. Remaining videos were not attempted.")
+            return "blocked"
+        except TranscriptError as exc:
+            self.db.mark_failed(row_id, str(exc))
+            self.tally["failed"] += 1
+            log.warning("  transcript failed: %s", exc)
+            return "failed"
+        except Exception as exc:  # unexpected bug or network error: record it and keep going
+            self.db.mark_failed(row_id, f"Unexpected error: {type(exc).__name__}: {exc}")
+            self.tally["failed"] += 1
+            log.exception("  unexpected error")
+            return "failed"
+        self.db.save_transcript(row_id, text, segments, info)
+        self.tally["transcripts"] += 1
+        log.info("  saved transcript (%d words)", info["word_count"])
+        return "ok"
 
     # ---- steps 3-4 -------------------------------------------------------------
 

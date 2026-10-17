@@ -12,7 +12,9 @@
   </div>
 </div>
 
-<section class="stats">
+<section class="stats stats-5">
+  <a class="stat stat-found" href="{{ url_for('found', pid=project.id) }}">
+    <span class="stat-n">{{ counts.found }}</span><span class="stat-l">Found, to review</span></a>
   <a class="stat stat-ready" href="{{ url_for('drafts', pid=project.id, view='ready') }}">
     <span class="stat-n">{{ counts.ready }}</span><span class="stat-l">Ready to publish</span></a>
   <a class="stat" href="{{ url_for('drafts', pid=project.id, view='progress') }}">
@@ -25,27 +27,29 @@
 
 <div class="grid-2">
   <section class="card">
-    <h2>Run the pipeline</h2>
     {% set running = job and job.status == 'running' %}
-    <form method="post" action="{{ url_for('start', pid=project.id) }}" class="primary-action">
+    <h2>1. Find videos</h2>
+    <form method="post" action="{{ url_for('find', pid=project.id) }}" class="find-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <input type="hidden" name="kind" value="run">
-      <button class="btn btn-primary btn-big" {{ 'disabled' if running }}>Run everything</button>
-      <p class="muted small">Finds new videos, saves transcripts, then writes articles and image prompts.
-        Each article takes a few minutes.</p>
+      <label for="count">How many</label>
+      <input id="count" name="count" type="number" min="1" max="500" value="{{ default_count }}" required>
+      <button class="btn btn-primary" {{ 'disabled' if running }}>Find videos</button>
     </form>
+    <p class="muted small">Searches your keywords and saves the best new matches with their stats. No transcripts
+      or AI yet. Uses about {{ search_cost }} of your 10,000 daily YouTube quota units.</p>
+    <h2 class="step-2">2. Pick the ones to write</h2>
+    <p class="small">{% if counts.found %}<a class="btn" href="{{ url_for('found', pid=project.id) }}">Review {{ counts.found }} found video{{ 's' if counts.found != 1 }}</a>
+      {% else %}<span class="muted">Found videos appear on the <a href="{{ url_for('found', pid=project.id) }}">Found</a> page. Tick the ones you want and click <em>Write selected</em>.</span>{% endif %}</p>
     <div class="action-list">
       {% for kind, title, text in [
-        ('write', 'Continue writing', 'Articles and image prompts for videos that already have transcripts.'),
-        ('transcripts', 'Find videos only', 'Search and save transcripts, without using Gemini.'),
+        ('write', 'Continue writing', (waiting ~ ' video(s) already have a transcript or article and are waiting for the next step.') if waiting else 'Nothing is waiting.'),
         ('retry', 'Retry failed', 'Try failed or interrupted videos again.'),
-        ('preview', 'Preview search', 'Show what a search would find. Saves nothing.'),
       ] %}
       <form method="post" action="{{ url_for('start', pid=project.id) }}" class="action-row">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <input type="hidden" name="kind" value="{{ kind }}">
         <div><strong>{{ title }}</strong><span class="muted small">{{ text }}</span></div>
-        <button class="btn" {{ 'disabled' if running }}>Start</button>
+        <button class="btn" {{ 'disabled' if running or (kind == 'write' and not waiting) or (kind == 'retry' and not counts.failed) }}>Start</button>
       </form>
       {% endfor %}
     </div>

@@ -1,9 +1,14 @@
 """SQLite storage: projects, videos (with transcripts, articles and image prompts), and jobs.
 
-Each video row belongs to one project. `stage` is the last pipeline step
-attempted (transcript -> article -> images -> published) and `status` is
-the result of that step: pending, done, or failed. A video whose images
-stage is done is ready to publish.
+Each video row belongs to one project. `stage` is where it is in the pipeline:
+
+    found -> transcript -> article -> images -> published
+      \-> dismissed
+
+"found" videos were discovered by a search and wait for you to pick them;
+"dismissed" ones you chose to skip (they are not found again). For the other
+stages, `status` is the result of that step: pending, done, or failed.
+A video whose images stage is done is ready to publish.
 """
 
 from __future__ import annotations
@@ -14,7 +19,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Optional
 
-STAGES = ("transcript", "article", "images", "published")
+STAGES = ("found", "transcript", "article", "images", "published", "dismissed")
+REVIEW_STAGES = ("found", "dismissed")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS projects (
@@ -38,6 +44,10 @@ CREATE TABLE IF NOT EXISTS videos (
     published_at         TEXT,
     view_count           INTEGER,
     duration_sec         INTEGER,
+    like_count           INTEGER,
+    comment_count        INTEGER,
+    channel_id           TEXT,
+    subscriber_count     INTEGER,
     metadata_json        TEXT,
     stage                TEXT NOT NULL DEFAULT 'transcript',
     status               TEXT NOT NULL CHECK (status IN ('pending', 'done', 'failed')),
@@ -91,7 +101,16 @@ class Database:
         self.conn.execute("PRAGMA foreign_keys = ON")
         self.conn.execute("PRAGMA journal_mode = WAL")  # lets the app read while a job writes
         self.conn.executescript(SCHEMA)
+        self._add_missing_columns()
         self.conn.commit()
+
+    def _add_missing_columns(self) -> None:
+        """Upgrade databases created by older versions of the app."""
+        have = {r["name"] for r in self.conn.execute("PRAGMA table_info(videos)")}
+        for name, kind in (("like_count", "INTEGER"), ("comment_count", "INTEGER"),
+                           ("channel_id", "TEXT"), ("subscriber_count", "INTEGER")):
+            if name not in have:
+                self.conn.execute(f"ALTER TABLE videos ADD COLUMN {name} {kind}")
 
     def close(self) -> None:
         self.conn.close()
@@ -186,14 +205,15 @@ class Database:
         return self.conn.execute(sql, params).fetchall()
 
     def videos(self, project_id: int, view: str = "all") -> list:
-        """Videos for the drafts list. view: ready | progress | published | failed | all."""
+        """Videos for the drafts list. view: ready | progress | published | failed | all.
+        Found and dismissed videos are not drafts yet; they're listed by found_videos()."""
         where = {
             "ready": "stage = 'images' AND status = 'done'",
             "published": "stage = 'published'",
             "failed": "status = 'failed'",
-            "progress": "status != 'failed' AND stage != 'published' "
+            "progress": "status != 'failed' AND stage NOT IN ('published', 'found', 'dismissed') "
                         "AND NOT (stage = 'images' AND status = 'done')",
-        }.get(view, "1 = 1")
+        }.get(view, "stage NOT IN ('found', 'dismissed')")
         return self.conn.execute(
             f"SELECT * FROM videos WHERE project_id = ? AND {where} ORDER BY updated_at DESC",
             (project_id,),
@@ -206,14 +226,34 @@ class Database:
         ).fetchall()
         return {(r["stage"], r["status"]): r["n"] for r in rows}
 
+    FOUND_SORTS = {
+        "views": "view_count DESC",
+        "likes": "like_count DESC",
+        "ratio": "CAST(like_count AS REAL) / MAX(view_count, 1) DESC",
+        "comments": "comment_count DESC",
+        "subscribers": "subscriber_count DESC",
+        "newest": "published_at DESC",
+        "length": "duration_sec DESC",
+        "found": "created_at DESC, view_count DESC",
+    }
+
+    def found_videos(self, project_id: int, dismissed: bool = False, sort: str = "views") -> list:
+        order = self.FOUND_SORTS.get(sort, self.FOUND_SORTS["views"])
+        return self.conn.execute(
+            f"SELECT * FROM videos WHERE project_id = ? AND stage = ? ORDER BY {order}",
+            (project_id, "dismissed" if dismissed else "found"),
+        ).fetchall()
+
     def summary_counts(self, project_id: int) -> dict:
         c = self.counts(project_id)
-        total = sum(c.values())
+        found = c.get(("found", "done"), 0)
+        dismissed = c.get(("dismissed", "done"), 0)
         ready = c.get(("images", "done"), 0)
         published = c.get(("published", "done"), 0)
         failed = sum(n for (_, status), n in c.items() if status == "failed")
-        return {"total": total, "ready": ready, "published": published, "failed": failed,
-                "progress": total - ready - published - failed}
+        drafts = sum(c.values()) - found - dismissed
+        return {"found": found, "dismissed": dismissed, "ready": ready, "published": published,
+                "failed": failed, "progress": drafts - ready - published - failed}
 
     def recent_failures(self, project_id: int, limit: int = 10) -> list:
         return self.conn.execute(
@@ -259,6 +299,43 @@ class Database:
             },
         )
         return self.video_by_youtube_id(project_id, video["video_id"])["id"]
+
+    def save_found(self, project_id: int, video: dict) -> None:
+        """Store a search result for you to review. Nothing is fetched for it yet."""
+        ts = now()
+        self._write(
+            """
+            INSERT INTO videos (project_id, video_id, title, channel_title, keyword, url, published_at,
+                                view_count, duration_sec, like_count, comment_count, channel_id,
+                                subscriber_count, metadata_json, stage, status, attempts,
+                                created_at, updated_at)
+            VALUES (:project_id, :video_id, :title, :channel_title, :keyword, :url, :published_at,
+                    :view_count, :duration_sec, :like_count, :comment_count, :channel_id,
+                    :subscriber_count, :metadata_json, 'found', 'done', 0, :ts, :ts)
+            ON CONFLICT(project_id, video_id) DO NOTHING
+            """,
+            {
+                "project_id": project_id, "video_id": video["video_id"], "title": video.get("title"),
+                "channel_title": video.get("channel_title"), "keyword": video.get("keyword"),
+                "url": video.get("url"), "published_at": video.get("published_at"),
+                "view_count": video.get("view_count"), "duration_sec": video.get("duration_seconds"),
+                "like_count": video.get("like_count"), "comment_count": video.get("comment_count"),
+                "channel_id": video.get("channel_id"), "subscriber_count": video.get("channel_subscribers"),
+                "metadata_json": json.dumps(video, ensure_ascii=False), "ts": ts,
+            },
+        )
+
+    def set_dismissed(self, project_id: int, row_ids: list, dismissed: bool) -> int:
+        """Dismiss found videos (or restore dismissed ones). Returns how many changed."""
+        if not row_ids:
+            return 0
+        marks = ",".join("?" * len(row_ids))
+        cur = self._write(
+            f"UPDATE videos SET stage = ?, updated_at = ? WHERE project_id = ? AND stage = ? AND id IN ({marks})",
+            ("dismissed" if dismissed else "found", now(), project_id,
+             "found" if dismissed else "dismissed", *row_ids),
+        )
+        return cur.rowcount
 
     def start_stage(self, row_id: int, stage: str) -> None:
         """Move a video to `stage` as pending. Attempts count per stage."""

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Found videos · {{ project.name }}{% endblock %}
+{% block content %}
+{% set queued = job.video_ids if job and job.status == 'running' and job.kind == 'process' and job.project_id == project.id else [] %}
+<div class="page-head">
+  <div>
+    <h1>{{ 'Dismissed videos' if dismissed else 'Found videos' }}</h1>
+    <p class="muted">{% if dismissed %}Videos you skipped. Restore any you want back on the Found list.
+      {% else %}Tick the videos worth writing about. Only those get a transcript, an article and image prompts.{% endif %}</p>
+  </div>
+  {% if not dismissed %}<a class="btn" href="{{ url_for('dashboard', pid=project.id) }}#count">Find more</a>{% endif %}
+</div>
+
+<nav class="tabs">
+  <a href="{{ url_for('found', pid=project.id, sort=sort) }}" class="{{ 'active' if not dismissed }}">To review <span class="count">{{ counts.found }}</span></a>
+  <a href="{{ url_for('found', pid=project.id, sort=sort, show='dismissed') }}" class="{{ 'active' if dismissed }}">Dismissed <span class="count">{{ counts.dismissed }}</span></a>
+</nav>
+
+{% if rows %}
+<form method="post" action="{{ url_for('found_action', pid=project.id) }}" data-select-form>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="sort" value="{{ sort }}">
+  <div class="select-bar">
+    <label class="check"><input type="checkbox" data-select-all> Select all</label>
+    <span class="muted small" data-selected-count>0 selected</span>
+    <span class="spacer"></span>
+    <label class="sort-by small">Sort by
+      <select data-sort-select>
+        {% for key, label in sorts %}
+        <option value="{{ url_for('found', pid=project.id, sort=key, show='dismissed' if dismissed else None) }}" {{ 'selected' if key == sort }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% if dismissed %}
+      <button class="btn" name="action" value="restore" data-needs-selection disabled>Restore</button>
+    {% else %}
+      <button class="btn" name="action" value="dismiss" data-needs-selection disabled>Dismiss</button>
+      <button class="btn btn-primary" name="action" value="process" data-needs-selection disabled
+              {{ 'data-busy' if job and job.status == 'running' }}>Write selected</button>
+    {% endif %}
+  </div>
+
+  <div class="video-list">
+    {% for r in rows %}
+    {% set is_queued = r.id in queued %}
+    <label class="video-card {{ 'queued' if is_queued }}">
+      <input type="checkbox" name="ids" value="{{ r.id }}" {{ 'disabled' if is_queued }}>
+      <img class="thumb" src="https://i.ytimg.com/vi/{{ r.video_id }}/mqdefault.jpg" alt="" loading="lazy">
+      <div class="video-info">
+        <a class="video-title" href="{{ r.url }}" target="_blank" rel="noopener">{{ r.title }}</a>
+        <div class="muted small">{{ r.channel_title }}
+          {% if r.subscriber_count is not none %} · {{ r.subscriber_count|compact }} subscribers{% else %} · subscribers hidden{% endif %}
+          {% if is_queued %} <span class="badge badge-progress">Being written</span>{% endif %}</div>
+        <div class="video-stats">
+          <span title="Views"><strong>{{ (r.view_count or 0)|compact }}</strong> views</span>
+          <span title="Likes">{% if r.like_count is not none %}<strong>{{ r.like_count|compact }}</strong> likes{% else %}likes hidden{% endif %}</span>
+          {% if r.like_count is not none and r.view_count %}<span title="Likes per 1,000 views, a rough quality signal"><strong>{{ '%.0f'|format(r.like_count * 1000 / r.view_count) }}</strong> likes / 1k views</span>{% endif %}
+          <span title="Comments">{% if r.comment_count is not none %}<strong>{{ r.comment_count|compact }}</strong> comments{% else %}comments off{% endif %}</span>
+          <span title="Length"><strong>{{ (r.duration_sec or 0) // 60 }}</strong> min</span>
+          <span title="Uploaded">{{ ago(r.published_at) }}</span>
+        </div>
+        <div class="muted small">Found with “{{ r.keyword }}”</div>
+      </div>
+    </label>
+    {% endfor %}
+  </div>
+</form>
+<p class="muted small">Dislike counts aren't shown because YouTube removed them from its public API in 2021.</p>
+{% else %}
+<div class="empty">
+  {% if dismissed %}No dismissed videos.
+  {% else %}No videos waiting for review. <a href="{{ url_for('dashboard', pid=project.id) }}">Find videos</a> on the dashboard.{% endif %}
+</div>
+{% endif %}
+{% endblock %}

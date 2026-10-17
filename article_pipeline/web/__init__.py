@@ -24,6 +24,9 @@ log = get_logger()
 ALLOWED_HOSTS = {"127.0.0.1", "localhost", "[::1]"}
 VIEWS = [("ready", "Ready to publish"), ("progress", "In progress"), ("published", "Published"),
          ("failed", "Failed"), ("all", "All")]
+FOUND_SORTS = [("views", "Most viewed"), ("likes", "Most liked"), ("ratio", "Best like ratio"),
+               ("subscribers", "Biggest channels"), ("comments", "Most comments"), ("newest", "Newest"),
+               ("length", "Longest")]
 STAGE_BADGES = {
     ("transcript", "done"): ("Needs article", "progress"),
     ("transcript", "pending"): ("Fetching transcript", "progress"),
@@ -70,6 +73,7 @@ def create_app() -> Flask:
             db.close()
 
     app.add_template_filter(lambda value: len(loads(value, []) or []), "json_len")
+    app.add_template_filter(_compact, "compact")
 
     @app.context_processor
     def template_globals():
@@ -99,9 +103,9 @@ def create_app() -> Flask:
             abort(404)
         return row
 
-    def start_job(pid, kind, task, back):
+    def start_job(pid, kind, task, back, video_ids=None):
         try:
-            runner.start(pid, kind, task)
+            runner.start(pid, kind, task, video_ids)
             flash(f"Started: {JOB_LABELS.get(kind, kind)}. Progress shows at the top of the page.", "ok")
         except RuntimeError as exc:
             flash(str(exc), "error")
@@ -121,14 +125,61 @@ def create_app() -> Flask:
     def dashboard(pid):
         load_project(pid)
         settings = loads(g.project["settings_json"], {})
+        keywords = (settings.get("search") or {}).get("keywords") or []
+        per_keyword = (settings.get("search") or {}).get("max_results_per_keyword", 25)
         return render_template(
             "dashboard.html",
             counts=g.db.summary_counts(pid),
             failures=g.db.recent_failures(pid, 5),
             jobs=g.db.jobs(pid, 8),
-            keywords=(settings.get("search") or {}).get("keywords") or [],
+            keywords=keywords,
+            default_count=(settings.get("filters") or {}).get("max_videos_per_run", 10),
+            search_cost=len(keywords) * -(-per_keyword // 50) * 100,
+            waiting=len(g.db.ready_for_next(pid, "transcript")) + len(g.db.ready_for_next(pid, "article")),
             job_labels=JOB_LABELS,
         )
+
+    @app.post("/p/<int:pid>/find")
+    def find(pid):
+        load_project(pid)
+        try:
+            limit = int(request.form.get("count", "").strip())
+            if not 1 <= limit <= 500:
+                raise ValueError
+        except ValueError:
+            flash("Enter how many videos to find, from 1 to 500.", "error")
+            return redirect(url_for("dashboard", pid=pid))
+        return start_job(pid, "find", lambda p: p.find(limit), url_for("dashboard", pid=pid))
+
+    @app.get("/p/<int:pid>/found")
+    def found(pid):
+        load_project(pid)
+        sort = request.args.get("sort", "views")
+        dismissed = request.args.get("show") == "dismissed"
+        counts = g.db.summary_counts(pid)
+        return render_template("found.html", rows=g.db.found_videos(pid, dismissed, sort), sort=sort,
+                               sorts=FOUND_SORTS, dismissed=dismissed, counts=counts)
+
+    @app.post("/p/<int:pid>/found")
+    def found_action(pid):
+        load_project(pid)
+        action = request.form.get("action")
+        try:
+            ids = [int(i) for i in request.form.getlist("ids")]
+        except ValueError:
+            abort(400)
+        back = url_for("found", pid=pid, sort=request.form.get("sort", "views"))
+        if not ids:
+            flash("Tick at least one video first.", "error")
+            return redirect(back)
+        if action in ("dismiss", "restore"):
+            n = g.db.set_dismissed(pid, ids, action == "dismiss")
+            flash(f"Dismissed {n} video(s). They won't be found again." if action == "dismiss"
+                  else f"Restored {n} video(s) to the Found list.", "ok")
+            return redirect(back)
+        if action == "process":
+            return start_job(pid, "process", lambda p: p.process(ids), back, video_ids=ids)
+        abort(400)
 
     @app.post("/p/<int:pid>/jobs")
     def start(pid):
@@ -426,21 +477,27 @@ def _mask(value) -> str:
     return "•" * 6 + value[-4:] if len(value) > 10 else "•" * 6
 
 
+def _compact(n) -> str:
+    """1234 -> 1.2K, 3400000 -> 3.4M."""
+    if n is None:
+        return ""
+    for size, suffix in ((1_000_000_000, "B"), (1_000_000, "M"), (1_000, "K")):
+        if n >= size:
+            value = f"{n / size:.1f}".rstrip("0").rstrip(".")
+            return f"{value}{suffix}"
+    return str(n)
+
+
 def _ago(iso) -> str:
     if not iso:
         return ""
     try:
-        then = datetime.fromisoformat(iso).astimezone()
+        then = datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone()
     except ValueError:
         return iso
     seconds = (datetime.now().astimezone() - then).total_seconds()
-    if seconds < 90:
-        return "just now"
-    if seconds < 3600:
-        return f"{int(seconds // 60)} min ago"
-    if seconds < 86400:
-        return f"{int(seconds // 3600)} h ago"
-    if seconds < 86400 * 7:
-        return f"{int(seconds // 86400)} d ago"
+    for limit, size, unit in ((90, None, None), (3600, 60, "min"), (86400, 3600, "h"), (86400 * 30, 86400, "d"),
+                              (86400 * 365, 86400 * 30, "mo"), (float("inf"), 86400 * 365, "y")):
+        if seconds < limit:
+            return "just now" if size is None else f"{int(seconds // size)} {unit} ago"
     return then.strftime("%Y-%m-%d")
-

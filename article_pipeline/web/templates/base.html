@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v=asset_version) }}">
   <script src="{{ url_for('static', filename='app.js', v=asset_version) }}" defer></script>
 </head>
-<body>
+<body {% if project %}data-found-url="{{ url_for('found', pid=project.id) }}"{% endif %}>
 <header class="topbar">
   <div class="topbar-inner">
     <a class="brand" href="{{ url_for('home') }}">Article Writer</a>
@@ -25,6 +25,7 @@
     <nav class="nav">
       {% set ep = request.endpoint %}
       <a href="{{ url_for('dashboard', pid=project.id) }}" class="{{ 'active' if ep == 'dashboard' }}">Dashboard</a>
+      <a href="{{ url_for('found', pid=project.id) }}" class="{{ 'active' if ep == 'found' }}">Found</a>
       <a href="{{ url_for('drafts', pid=project.id) }}" class="{{ 'active' if ep in ('drafts', 'draft') }}">Drafts</a>
       <a href="{{ url_for('settings_page', pid=project.id) }}" class="{{ 'active' if ep == 'settings_page' }}">Settings</a>
       <a href="{{ url_for('prompts_page', pid=project.id) }}" class="{{ 'active' if ep == 'prompts_page' }}">Prompts</a>

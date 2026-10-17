@@ -105,7 +105,36 @@ code { font-family: var(--mono); font-size: .9em; background: var(--surface-2); 
 .stat-l { color: var(--muted); font-size: .85rem; }
 .stat-ready .stat-n { color: var(--accent); }
 .stat-failed .stat-n { color: var(--bad); }
-@media (max-width: 640px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+.stats-5 { grid-template-columns: repeat(5, 1fr); }
+.stat-found .stat-n { color: var(--info); }
+@media (max-width: 760px) { .stats, .stats-5 { grid-template-columns: repeat(2, 1fr); } }
+
+/* ---- find + found ---- */
+.find-form { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.find-form label { font-weight: 600; }
+.find-form input { width: 6.5rem; }
+.step-2 { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.select-bar { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; position: sticky; top: 52px; z-index: 4;
+  background: var(--bg); padding: .6rem 0; border-bottom: 1px solid var(--border); margin-bottom: .75rem; }
+.sort-by { display: flex; align-items: center; gap: .4rem; color: var(--muted); }
+.sort-by select { width: auto; padding: .3rem .5rem; }
+.video-list { display: flex; flex-direction: column; gap: .6rem; }
+.video-card { display: grid; grid-template-columns: auto 168px 1fr; gap: .9rem; align-items: start; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius); padding: .75rem; cursor: pointer; box-shadow: var(--shadow); }
+.video-card:hover { border-color: var(--accent); }
+.video-card:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.video-card.queued { opacity: .7; cursor: default; }
+.video-card input[type="checkbox"] { margin-top: .35rem; width: 18px; height: 18px; accent-color: var(--accent); }
+.thumb { width: 168px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; background: var(--surface-2); }
+.video-info { display: flex; flex-direction: column; gap: .3rem; min-width: 0; }
+.video-title { font-weight: 600; color: var(--text); line-height: 1.35; }
+.video-stats { display: flex; flex-wrap: wrap; gap: .25rem 1rem; font-size: .88rem; color: var(--muted); }
+.video-stats strong { color: var(--text); font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .video-card { grid-template-columns: auto 1fr; }
+  .thumb { grid-column: 2; width: 100%; }
+  .video-info { grid-column: 2; }
+}
 
 /* ---- buttons ---- */
 .btn, button { font: inherit; }

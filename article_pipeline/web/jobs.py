@@ -19,6 +19,8 @@ from ..youtube_search import YouTubeAPIError
 log = get_logger()
 
 JOB_LABELS = {
+    "find": "Find videos",
+    "process": "Write selected videos",
     "run": "Run everything",
     "transcripts": "Find videos + save transcripts",
     "preview": "Preview search",
@@ -49,7 +51,8 @@ class JobRunner:
     def busy(self) -> bool:
         return bool(self.current and self.current["status"] == "running")
 
-    def start(self, project_id: Optional[int], kind: str, task: Callable[[Pipeline], None]) -> int:
+    def start(self, project_id: Optional[int], kind: str, task: Callable[[Pipeline], None],
+              video_ids: Optional[list] = None) -> int:
         """Start `task(pipeline)` in the background. Raises RuntimeError if a job is already running."""
         with self._lock:
             if self.busy():
@@ -61,6 +64,7 @@ class JobRunner:
                 "label": JOB_LABELS.get(kind, kind), "status": "running", "summary": "",
                 "lines": deque(maxlen=3000), "cancel": threading.Event(),
                 "started": datetime.now().strftime("%H:%M:%S"),
+                "video_ids": list(video_ids or []),
             }
             job = self.current
         threading.Thread(target=self._run, args=(job, task), daemon=True).start()
@@ -76,7 +80,8 @@ class JobRunner:
         if not job:
             return None
         lines = list(job["lines"])
-        return {k: job[k] for k in ("id", "project_id", "kind", "label", "status", "summary", "started")} | {
+        return {k: job[k] for k in ("id", "project_id", "kind", "label", "status", "summary", "started",
+                                    "video_ids")} | {
             "lines": lines[since:], "total_lines": len(lines),
             "stopping": job["cancel"].is_set() and job["status"] == "running",
         }

@@ -37,6 +37,7 @@ class VideoInfo:
     description: str = ""
     tags: list = field(default_factory=list)
     keyword: str = ""
+    channel_subscribers: Optional[int] = None  # None when the channel hides it
 
     @property
     def url(self) -> str:
@@ -102,6 +103,19 @@ class YouTubeClient:
             if not page_token:
                 break
         return ids
+
+    def channel_subscribers(self, channel_ids: list) -> dict:
+        """channel_id -> subscriber count (None if hidden). 1 quota unit per 50 channels."""
+        counts: dict = {}
+        unique = list(dict.fromkeys(c for c in channel_ids if c))
+        for start in range(0, len(unique), 50):
+            chunk = unique[start:start + 50]
+            data = self._get("channels", {"part": "statistics", "id": ",".join(chunk)}, cost=1)
+            for item in data.get("items", []):
+                stats = item.get("statistics", {})
+                hidden = stats.get("hiddenSubscriberCount")
+                counts[item["id"]] = None if hidden else int(stats.get("subscriberCount", 0))
+        return counts
 
     def video_details(self, video_ids: list) -> list:
         """Fetch title, stats and duration for up to any number of IDs (50 per call)."""
@@ -249,8 +263,9 @@ def _rejection_reason(item: dict, video: VideoInfo, settings: Settings, cutoff: 
     return None
 
 
-def discover_videos(settings: Settings, client: YouTubeClient, db: Database) -> list:
-    """Search every keyword, drop already-tracked and filtered-out videos, return new VideoInfo list."""
+def discover_videos(settings: Settings, client: YouTubeClient, db: Database, limit: Optional[int] = None) -> list:
+    """Search every keyword, drop already-tracked and filtered-out videos, and return up to
+    `limit` new videos (default: filters.max_videos_per_run), most viewed first."""
     s, f = settings.search, settings.filters
     cutoff = datetime.now(timezone.utc) - timedelta(days=f.max_age_days)
     duration_bucket = _api_duration_bucket(f.min_duration_minutes, f.max_duration_minutes)
@@ -301,11 +316,19 @@ def discover_videos(settings: Settings, client: YouTubeClient, db: Database) -> 
         log.info("Filtered out %d: %s", sum(rejections.values()),
                  ", ".join(f"{n} {r}" for r, n in rejections.most_common()))
 
+    limit = limit or f.max_videos_per_run
     kept.sort(key=lambda v: v.view_count, reverse=True)
-    if len(kept) > f.max_videos_per_run:
-        log.info("Keeping the top %d of %d by views (filters.max_videos_per_run).",
-                 f.max_videos_per_run, len(kept))
-        kept = kept[: f.max_videos_per_run]
+    if len(kept) > limit:
+        log.info("Keeping the top %d of %d by views.", limit, len(kept))
+        kept = kept[:limit]
+    elif len(kept) < limit:
+        log.info("Only %d new video(s) matched (you asked for %d). For more, raise 'Results per keyword', "
+                 "add keywords, or loosen the filters in Settings.", len(kept), limit)
+
+    if kept:
+        subs = client.channel_subscribers([v.channel_id for v in kept])
+        for v in kept:
+            v.channel_subscribers = subs.get(v.channel_id)
 
     log.info("%d new video(s) passed the filters. Approx. quota used: %d units.",
              len(kept), client.quota_used)

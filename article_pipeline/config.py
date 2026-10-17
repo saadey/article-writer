@@ -14,7 +14,7 @@ from dotenv import dotenv_values
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
-DB_PATH = DATA_DIR / "app.db"
+DB_PATH = Path(os.environ.get("ARTICLE_WRITER_DB") or DATA_DIR / "app.db")  # override for testing
 LOG_DIR = PROJECT_ROOT / "logs"
 EXPORTS_DIR = PROJECT_ROOT / "exports"
 ENV_PATH = PROJECT_ROOT / ".env"

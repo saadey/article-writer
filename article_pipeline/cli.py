@@ -42,7 +42,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("-v", "--verbose", action="store_true", help="Show debug detail")
     sub = parser.add_subparsers(dest="command", metavar="command")
 
-    run = sub.add_parser("run", help="Do everything: find videos, transcripts, articles, image prompts")
+    find = sub.add_parser("find", help="Search and save new videos for review (no transcripts or AI)")
+    find.add_argument("--count", "-n", type=int, default=None, help="How many videos (default: from settings)")
+    sub.add_parser("found", help="List found videos waiting for review, with their stats")
+    process = sub.add_parser("process", help="Write the chosen found videos: transcript, article, images")
+    process.add_argument("video_ids", nargs="+", metavar="VIDEO_ID")
+
+    run = sub.add_parser("run", help="Fully automatic, no review: find new videos and write them all")
     run.add_argument("--dry-run", action="store_true", help="Only list the videos that would be processed")
     run.add_argument("--no-write", action="store_true", help="Stop after saving transcripts")
 
@@ -109,7 +115,18 @@ def main(argv=None) -> int:
 def dispatch(args, db: Database, pipeline: Pipeline) -> int:
     pid = pipeline.project_id
     cmd = args.command
-    if cmd == "run":
+    if cmd == "find":
+        pipeline.find(args.count)
+        log.info("Review them with: python main.py found")
+        return 0
+    if cmd == "found":
+        return cmd_found(db, pid)
+    if cmd == "process":
+        rows = [_row(db, pid, v) for v in args.video_ids]
+        if not all(rows):
+            return 1
+        pipeline.process([r["id"] for r in rows])
+    elif cmd == "run":
         if args.dry_run:
             for v in pipeline.discover():
                 log.info("  would process %s | %s views | %d min | %s",
@@ -144,7 +161,7 @@ def dispatch(args, db: Database, pipeline: Pipeline) -> int:
     elif cmd == "check":
         pipeline.check_keys()
         return 0
-    if cmd in ("run", "write", "images", "retry"):
+    if cmd in ("run", "write", "images", "retry", "process"):
         log.info("Done: %s.", pipeline.summary())
     return 0
 
@@ -161,6 +178,22 @@ def cmd_projects(db: Database) -> int:
         c = db.summary_counts(p["id"])
         print(f"  {p['name']}: {c['ready']} ready, {c['progress']} in progress, "
               f"{c['published']} published, {c['failed']} failed")
+    return 0
+
+
+def cmd_found(db: Database, pid: int) -> int:
+    rows = db.found_videos(pid)
+    if not rows:
+        print("No found videos to review. Run: python main.py find")
+        return 0
+    print(f"{len(rows)} video(s) to review (most viewed first):\n")
+    for r in rows:
+        subs = f"{r['subscriber_count']:,}" if r["subscriber_count"] is not None else "hidden"
+        likes = f"{r['like_count']:,}" if r["like_count"] is not None else "hidden"
+        print(f"  {r['video_id']}  {r['title']}")
+        print(f"      {r['channel_title']} ({subs} subscribers) | {r['view_count']:,} views | {likes} likes | "
+              f"{(r['duration_sec'] or 0) // 60} min")
+    print("\nWrite the ones you want: python main.py process VIDEO_ID [VIDEO_ID ...]")
     return 0
 
 

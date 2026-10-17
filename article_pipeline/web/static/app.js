@@ -48,6 +48,39 @@
     });
   });
 
+  // Found page: select videos, then act on them
+  const selectForm = document.querySelector("[data-select-form]");
+  if (selectForm) {
+    const boxes = () => [...selectForm.querySelectorAll('input[name="ids"]:not(:disabled)')];
+    const all = selectForm.querySelector("[data-select-all]");
+    const label = selectForm.querySelector("[data-selected-count]");
+    const update = () => {
+      const n = boxes().filter((b) => b.checked).length;
+      label.textContent = n + " selected";
+      selectForm.querySelectorAll("[data-needs-selection]").forEach((b) => { b.disabled = n === 0; });
+      if (all) all.checked = n > 0 && n === boxes().length;
+    };
+    selectForm.addEventListener("change", (e) => {
+      if (e.target === all) boxes().forEach((b) => { b.checked = all.checked; });
+      update();
+    });
+    selectForm.addEventListener("submit", (e) => {
+      const btn = e.submitter;
+      const n = boxes().filter((b) => b.checked).length;
+      if (btn && btn.value === "process" && btn.hasAttribute("data-busy")) {
+        e.preventDefault();
+        toast("Another task is running. Wait for it to finish or press Stop.");
+      } else if (btn && btn.value === "process" && n > 5 &&
+                 !confirm("Write " + n + " videos? Each takes a few minutes and uses Gemini free quota.")) {
+        e.preventDefault();
+      }
+    });
+    update();
+  }
+  document.querySelectorAll("[data-sort-select]").forEach((sel) => {
+    sel.addEventListener("change", () => { window.location = sel.value; });
+  });
+
   // Tabs on the draft page (no reload; the URL keeps the tab)
   const tabs = document.querySelector("[data-tabs]");
   if (tabs) {
@@ -101,8 +134,14 @@
     }
     if (wasRunning && !running) {
       toast("Task finished: " + (job.summary || job.status));
+      const foundUrl = document.body.dataset.foundUrl;
+      if (job.kind === "find" && job.status === "done" && foundUrl && document.querySelector(".stats")) {
+        setTimeout(() => { location = foundUrl; }, 1200);  // show what was found
+        wasRunning = false;
+        return;
+      }
       // Refresh pages whose content the task changed.
-      if (document.querySelector("[data-autoreload], [data-tabs], .stats, .tabs")) setTimeout(() => location.reload(), 1200);
+      if (document.querySelector("[data-autoreload], [data-tabs], .stats, .tabs, [data-select-form]")) setTimeout(() => location.reload(), 1200);
     }
     if (running && !wasRunning && document.querySelector(".stats")) location.reload();
     wasRunning = running;

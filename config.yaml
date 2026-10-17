@@ -71,16 +71,17 @@ writing:
     - gemini-3.6-flash
     - gemini-3.5-flash-lite
 
+  # Who you write for. Added to the instructions; leave "" to skip.
   audience: "Beginners in their 20s and 30s who want practical money advice"
-  tone: "Friendly, clear, no hype. Write like a knowledgeable friend."
+  # Leave "" when your instructions file already describes the tone.
+  tone: ""
   target_word_count: 1200
-  instructions: |
-    Turn the transcript into an original Substack-style article.
-    - Start with a hook that states the reader's problem.
-    - Use short paragraphs and descriptive H2 subheadings.
-    - Keep the creator's key ideas but write in your own words; never copy sentences.
-    - End with a short summary and one actionable takeaway.
-    - Do not mention "this video" or "the transcript".
+
+  # Your full instruction set for the AI writer (plain text/Markdown file).
+  # Edit that file to change how articles are written. Each niche can
+  # point to its own file. (Or delete this line and put the text inline
+  # under `instructions: |` instead.)
+  instructions_file: prompts/article_instructions.md
 
   # Add a "Inspired by <video> by <channel>" line at the end of each article.
   include_source_credit: true

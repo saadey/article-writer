@@ -106,14 +106,29 @@ writing:
   model: gemini-3.8-flash
   fallback_models: [gemini-3.6-flash, gemini-3.5-flash-lite]
   audience: "..."
-  tone: "..."
+  tone: ""                     # leave empty if your instructions file covers tone
   target_word_count: 1200
-  instructions: |
-    ...                        # your style guide: structure, voice, dos and don'ts
+  instructions_file: prompts/article_instructions.md
   include_source_credit: true  # adds "Inspired by <video> by <channel>" at the end
 ```
 
 If you mistype a setting name, the pipeline tells you exactly which one is wrong.
+
+### Changing how articles are written
+
+The instructions for the AI writer live in **`prompts/article_instructions.md`**: titles, structure,
+tone, what to remove, style rules. Edit that file in any text editor; no code changes needed. The next
+article picks up your changes. The pipeline adds the niche, audience, target length and the response
+format automatically, so you only write the editorial part.
+
+To try new instructions on an article you already have, regenerate just that one:
+
+```bash
+python main.py write --video bNIAi9Sm3rY   # the video ID is at the end of each draft folder name
+```
+
+For a different niche with a different style, create another file (e.g. `prompts/fitness.md`) and set
+`instructions_file: prompts/fitness.md` in that niche's config.
 
 **Several niches:** copy `config.yaml` to e.g. `config.fitness.yaml`, change its keywords and give it its
 own `output.database_path` and `output.drafts_dir`, then run it with `--config`:
@@ -129,6 +144,7 @@ python main.py run --dry-run   # search + filter only: shows what would be proce
 python main.py run             # all steps: search, filter, transcripts, articles
 python main.py run --no-write  # stop after transcripts (no Gemini calls)
 python main.py write           # write articles for saved transcripts that don't have one yet
+python main.py write --video ID  # rewrite one article (e.g. after editing the instructions)
 python main.py status          # how many videos are at each step, and the latest errors
 python main.py retry           # try failed (or interrupted) videos again
 python main.py -v run          # same as run, but explains why each video was filtered out
@@ -144,10 +160,11 @@ drafts/
     metadata.json      # title, channel, URL, views, duration, keyword, transcript info
     transcript.txt     # clean transcript in ~1-minute paragraphs
     transcript.json    # raw caption lines with timestamps
-    article.md         # the finished article: title, subtitle, body, source credit
+    article.md         # the publication ready article: title, subtitle, body, source credit
+    editor_notes.md    # for you, not readers: 3 title options, what was removed, claims to fact-check
 ```
 
-The article's title, word count and the Gemini model used are also added to `metadata.json`.
+The article's title, title options, word count and the Gemini model used are also added to `metadata.json`.
 A later step will add image prompts to the same folder.
 
 ### How re-runs work
@@ -169,6 +186,8 @@ So you can run `python main.py run` every day and only new work gets done.
 .
 ├── main.py                    # entry point: python main.py <command>
 ├── config.yaml                # your niche settings
+├── prompts/
+│   └── article_instructions.md  # how the AI writes articles (edit freely)
 ├── .env.example               # template for your secrets (copy to .env)
 ├── requirements.txt
 └── article_pipeline/

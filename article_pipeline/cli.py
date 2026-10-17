@@ -44,6 +44,8 @@ def build_parser() -> argparse.ArgumentParser:
     write = sub.add_parser("write", help="Write articles for saved transcripts that don't have one yet")
     write.add_argument("--limit", type=int, default=None,
                        help="Write at most this many (default: writing.max_articles_per_run)")
+    write.add_argument("--video", metavar="VIDEO_ID", default=None,
+                       help="(Re)write the article for this one video, e.g. to test new instructions")
 
     retry = sub.add_parser("retry", help="Retry videos that failed (or were interrupted) earlier")
     retry.add_argument("--limit", type=int, default=None, help="Retry at most this many videos per step")
@@ -74,7 +76,7 @@ def main(argv=None) -> int:
             if args.command == "run":
                 return cmd_run(settings, db, args.dry_run, args.no_write)
             if args.command == "write":
-                return cmd_write(settings, db, args.limit)
+                return cmd_write(settings, db, args.limit, args.video)
             if args.command == "retry":
                 return cmd_retry(settings, db, args.limit)
             if args.command == "status":
@@ -112,7 +114,16 @@ def cmd_run(settings: Settings, db: Database, dry_run: bool, no_write: bool) -> 
     return cmd_write(settings, db, None)
 
 
-def cmd_write(settings: Settings, db: Database, limit) -> int:
+def cmd_write(settings: Settings, db: Database, limit, video_id=None) -> int:
+    if video_id:
+        row = db.get(video_id)
+        if row is None:
+            log.error("Video %s is not in the database. Check the ID with 'python main.py status'.", video_id)
+            return 1
+        if (row["stage"], row["status"]) in (("transcript", "failed"), ("transcript", "pending")):
+            log.error("Video %s has no saved transcript yet; run 'python main.py retry' first.", video_id)
+            return 1
+        return process_articles(settings, db, [row])
     limit = limit or settings.writing.max_articles_per_run
     rows = db.ready_for_next("transcript", limit=limit)
     if not rows:

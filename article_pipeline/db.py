@@ -83,6 +83,9 @@ class Database:
             params.append(limit)
         return self.conn.execute(sql, params).fetchall()
 
+    def get(self, video_id: str):
+        return self.conn.execute("SELECT * FROM videos WHERE video_id = ?", (video_id,)).fetchone()
+
     def ready_for_next(self, finished_stage: str, limit: Optional[int] = None) -> list:
         """Videos whose `finished_stage` is done, i.e. waiting for the next step."""
         sql = "SELECT * FROM videos WHERE stage = ? AND status = 'done' ORDER BY view_count DESC"

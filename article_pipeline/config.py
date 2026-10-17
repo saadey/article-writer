@@ -84,9 +84,10 @@ class TranscriptConfig:
 class WritingConfig:
     model: str = "gemini-3.8-flash"
     fallback_models: list = field(default_factory=list)
-    audience: str = "General readers"
-    tone: str = "Clear and friendly"
+    audience: str = ""
+    tone: str = ""
     target_word_count: int = 1200
+    instructions_file: Optional[str] = None
     instructions: str = ""
     include_source_credit: bool = True
     temperature: float = 0.8
@@ -102,6 +103,19 @@ class WritingConfig:
         _require_number("writing.temperature", self.temperature, 0, 2)
         _require_number("writing.delay_seconds", self.delay_seconds, 0)
         _require_int("writing.max_articles_per_run", self.max_articles_per_run, 1)
+        if self.instructions_file and self.instructions.strip():
+            raise ConfigError("Set either writing.instructions_file or writing.instructions, not both.")
+
+    def load_instructions(self) -> None:
+        """Read instructions_file (relative to the project folder) into `instructions`."""
+        if not self.instructions_file:
+            return
+        path = _resolve(self.instructions_file)
+        if not path.exists():
+            raise ConfigError(f"writing.instructions_file not found: {path}")
+        self.instructions = path.read_text(encoding="utf-8").strip()
+        if not self.instructions:
+            raise ConfigError(f"writing.instructions_file is empty: {path}")
 
     @property
     def models(self) -> list:
@@ -184,6 +198,7 @@ def load_settings(config_path: Optional[Path] = None) -> Settings:
     output = _build(OutputConfig, raw.get("output"), "output")
     for section in (search, filters, transcripts, writing):
         section.validate()
+    writing.load_instructions()
 
     niche = raw.get("niche") or {}
 

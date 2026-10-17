@@ -1,0 +1,162 @@
+"""Step 2: fetch transcripts and save each video as a draft folder."""
+
+from __future__ import annotations
+
+import json
+import re
+import unicodedata
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+from youtube_transcript_api import (
+    AgeRestricted,
+    CouldNotRetrieveTranscript,
+    NoTranscriptFound,
+    RequestBlocked,
+    TranscriptsDisabled,
+    VideoUnavailable,
+    YouTubeTranscriptApi,
+)
+from youtube_transcript_api.proxies import GenericProxyConfig
+
+from .config import TranscriptConfig
+from .youtube_search import VideoInfo
+
+# Caption noise like [Music], [Applause], (laughs)
+_NOISE_RE = re.compile(r"[\[(](?:music|applause|laughter|laughs|inaudible|silence)[\])]", re.I)
+PARAGRAPH_SECONDS = 60
+
+
+class TranscriptError(Exception):
+    """This video has no usable transcript. Mark it failed and continue."""
+
+
+class TranscriptBlockedError(TranscriptError):
+    """YouTube is blocking this IP. Stop the run, since every other video would fail too."""
+
+
+def make_transcript_api(proxy_url: Optional[str]) -> YouTubeTranscriptApi:
+    if proxy_url:
+        return YouTubeTranscriptApi(proxy_config=GenericProxyConfig(http_url=proxy_url, https_url=proxy_url))
+    return YouTubeTranscriptApi()
+
+
+def fetch_transcript(api: YouTubeTranscriptApi, video_id: str, cfg: TranscriptConfig) -> dict:
+    """Return {'segments': [...], 'language_code', 'language', 'is_generated', 'translated'}."""
+    try:
+        transcript_list = api.list(video_id)
+        translated = False
+        try:
+            if cfg.allow_auto_generated:
+                transcript = transcript_list.find_transcript(cfg.languages)
+            else:
+                transcript = transcript_list.find_manually_created_transcript(cfg.languages)
+        except NoTranscriptFound:
+            if not cfg.translate_if_missing:
+                raise
+            source = next(
+                (t for t in transcript_list
+                 if t.is_translatable and (cfg.allow_auto_generated or not t.is_generated)),
+                None,
+            )
+            if source is None:
+                raise
+            transcript = source.translate(cfg.languages[0])
+            translated = True
+
+        fetched = transcript.fetch()
+    except TranscriptsDisabled:
+        raise TranscriptError("Captions are disabled for this video.")
+    except NoTranscriptFound:
+        kind = "" if cfg.allow_auto_generated else "manually created "
+        raise TranscriptError(f"No {kind}transcript in languages {cfg.languages}.")
+    except VideoUnavailable:
+        raise TranscriptError("Video is unavailable (deleted or private).")
+    except AgeRestricted:
+        raise TranscriptError("Video is age-restricted; transcripts need a signed-in session.")
+    except RequestBlocked:
+        raise TranscriptBlockedError(
+            "YouTube is blocking transcript requests from your IP (too many requests, or a "
+            "cloud/VPN IP). Wait a few hours, switch network, or set TRANSCRIPT_PROXY_URL in .env."
+        )
+    except CouldNotRetrieveTranscript as exc:
+        cause = (exc.cause or "").strip().splitlines()
+        raise TranscriptError(cause[0] if cause else f"Could not retrieve transcript: {type(exc).__name__}")
+
+    segments = [
+        {"start": round(s.start, 2), "duration": round(s.duration, 2), "text": s.text}
+        for s in fetched.snippets
+    ]
+    return {
+        "segments": segments,
+        "language_code": fetched.language_code,
+        "language": fetched.language,
+        "is_generated": fetched.is_generated,
+        "translated": translated,
+    }
+
+
+def segments_to_text(segments: list) -> str:
+    """Join caption lines into readable paragraphs of roughly one minute each."""
+    paragraphs, current, paragraph_start = [], [], 0.0
+    for seg in segments:
+        text = _NOISE_RE.sub(" ", seg["text"].replace("\n", " "))
+        text = re.sub(r"\s+", " ", text).strip()
+        if not text:
+            continue
+        if current and seg["start"] - paragraph_start >= PARAGRAPH_SECONDS:
+            paragraphs.append(" ".join(current))
+            current, paragraph_start = [], seg["start"]
+        if not current:
+            paragraph_start = seg["start"]
+        current.append(text)
+    if current:
+        paragraphs.append(" ".join(current))
+    return "\n\n".join(paragraphs)
+
+
+def slugify(text: str, max_length: int = 60) -> str:
+    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+    text = re.sub(r"[^a-zA-Z0-9]+", "-", text).strip("-").lower()
+    return text[:max_length].rstrip("-") or "video"
+
+
+def draft_folder(drafts_dir: Path, video: VideoInfo) -> Path:
+    return drafts_dir / f"{slugify(video.title)}-{video.video_id}"
+
+
+def save_transcript_draft(
+    api: YouTubeTranscriptApi, video: VideoInfo, cfg: TranscriptConfig, drafts_dir: Path
+) -> Path:
+    """Fetch the transcript and write the video's draft folder. Returns the folder path."""
+    result = fetch_transcript(api, video.video_id, cfg)
+    text = segments_to_text(result["segments"])
+    word_count = len(text.split())
+    if word_count < cfg.min_words:
+        raise TranscriptError(
+            f"Transcript too short ({word_count} words; transcripts.min_words is {cfg.min_words})."
+        )
+
+    folder = draft_folder(drafts_dir, video)
+    folder.mkdir(parents=True, exist_ok=True)
+
+    (folder / "transcript.txt").write_text(text + "\n", encoding="utf-8")
+    (folder / "transcript.json").write_text(
+        json.dumps(result["segments"], ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    metadata = {
+        **video.to_dict(),
+        "transcript": {
+            "language_code": result["language_code"],
+            "language": result["language"],
+            "is_generated": result["is_generated"],
+            "translated": result["translated"],
+            "word_count": word_count,
+            "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        },
+    }
+    (folder / "metadata.json").write_text(
+        json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return folder

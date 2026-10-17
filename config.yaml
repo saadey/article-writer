@@ -1,0 +1,83 @@
+# ============================================================
+#  Niche configuration
+#  Everything about *what* the pipeline looks for and *how* it
+#  writes lives here. Change this file to switch niches; no code
+#  changes needed. To run several niches side by side, copy this
+#  file (e.g. config.fitness.yaml), give it its own database_path
+#  and drafts_dir, and run:  python main.py --config config.fitness.yaml run
+# ============================================================
+
+niche:
+  name: "Personal Finance"
+
+# ---- Step 1: YouTube search -----------------------------------
+search:
+  # Each keyword is one YouTube search. Each search costs 100 quota
+  # units per page of 50 results (free quota: 10,000 units/day).
+  keywords:
+    - "how to budget money"
+    - "index fund investing for beginners"
+    - "pay off debt fast"
+
+  # Results to request per keyword (1-200). Above 50 uses extra pages
+  # and extra quota.
+  max_results_per_keyword: 25
+
+  # relevance | date | viewCount | rating
+  order: relevance
+
+  # Optional: bias results toward a language / country. Use null to disable.
+  relevance_language: en
+  region_code: US
+
+  # none | moderate | strict
+  safe_search: moderate
+
+# ---- Filters applied to search results ------------------------
+filters:
+  min_views: 10000
+  max_age_days: 365            # only videos published in the last N days
+  min_duration_minutes: 8      # skip Shorts and very short clips
+  max_duration_minutes: 60     # skip very long streams/podcasts
+  # Skip videos whose title contains any of these (case-insensitive).
+  exclude_title_words:
+    - "#shorts"
+    - "live stream"
+  # Skip these channels (channel name or channel ID).
+  exclude_channels: []
+  # Upper limit of new videos processed per run (highest views first).
+  max_videos_per_run: 10
+
+# ---- Step 2: Transcripts --------------------------------------
+transcripts:
+  # Preferred transcript languages, in priority order.
+  languages: ["en"]
+  # Allow YouTube's auto-generated captions (most videos only have these).
+  allow_auto_generated: true
+  # If no transcript exists in `languages`, translate another one into
+  # the first language in the list.
+  translate_if_missing: false
+  # Treat transcripts shorter than this as failed (not enough material).
+  min_words: 400
+  # Pause between transcript requests to avoid being rate limited.
+  delay_seconds: 2
+
+# ---- Step 3: Article writing (used in a later step) -----------
+writing:
+  audience: "Beginners in their 20s and 30s who want practical money advice"
+  tone: "Friendly, clear, no hype. Write like a knowledgeable friend."
+  target_word_count: 1200
+  instructions: |
+    Turn the transcript into an original Substack-style article.
+    - Start with a hook that states the reader's problem.
+    - Use short paragraphs and descriptive H2 subheadings.
+    - Keep the creator's key ideas but write in your own words; never copy sentences.
+    - End with a short summary and one actionable takeaway.
+    - Do not mention "this video" or "the transcript".
+
+# ---- Where things are saved ----------------------------------
+# Relative paths are resolved from the project folder.
+output:
+  drafts_dir: drafts
+  database_path: data/pipeline.db
+  log_dir: logs

@@ -81,6 +81,39 @@ class TranscriptConfig:
 
 
 @dataclass
+class WritingConfig:
+    model: str = "gemini-3.8-flash"
+    fallback_models: list = field(default_factory=list)
+    audience: str = "General readers"
+    tone: str = "Clear and friendly"
+    target_word_count: int = 1200
+    instructions: str = ""
+    include_source_credit: bool = True
+    temperature: float = 0.8
+    delay_seconds: float = 5
+    max_articles_per_run: int = 10
+
+    def validate(self) -> None:
+        if not isinstance(self.model, str) or not self.model.strip():
+            raise ConfigError("writing.model must be a Gemini model name, e.g. gemini-3.8-flash.")
+        if not isinstance(self.fallback_models, list):
+            raise ConfigError("writing.fallback_models must be a list (use [] for none).")
+        _require_int("writing.target_word_count", self.target_word_count, 200, 6000)
+        _require_number("writing.temperature", self.temperature, 0, 2)
+        _require_number("writing.delay_seconds", self.delay_seconds, 0)
+        _require_int("writing.max_articles_per_run", self.max_articles_per_run, 1)
+
+    @property
+    def models(self) -> list:
+        """Primary model first, then fallbacks, without duplicates."""
+        seen: list = []
+        for m in [self.model, *self.fallback_models]:
+            if m and m not in seen:
+                seen.append(m)
+        return seen
+
+
+@dataclass
 class OutputConfig:
     drafts_dir: str = "drafts"
     database_path: str = "data/pipeline.db"
@@ -94,12 +127,21 @@ class Settings:
     search: SearchConfig
     filters: FilterConfig
     transcripts: TranscriptConfig
-    writing: dict
+    writing: WritingConfig
     drafts_dir: Path
     database_path: Path
     log_dir: Path
     youtube_api_key: Optional[str]
     transcript_proxy_url: Optional[str]
+    gemini_api_key: Optional[str]
+
+    def require_gemini_key(self) -> str:
+        if not self.gemini_api_key:
+            raise ConfigError(
+                "GEMINI_API_KEY is not set. Get a free key at https://aistudio.google.com/apikey "
+                "and paste it after GEMINI_API_KEY= in .env (see README)."
+            )
+        return self.gemini_api_key
 
     def require_youtube_key(self) -> str:
         if not self.youtube_api_key:
@@ -138,14 +180,12 @@ def load_settings(config_path: Optional[Path] = None) -> Settings:
     search = _build(SearchConfig, raw.get("search"), "search")
     filters = _build(FilterConfig, raw.get("filters"), "filters")
     transcripts = _build(TranscriptConfig, raw.get("transcripts"), "transcripts")
+    writing = _build(WritingConfig, raw.get("writing"), "writing")
     output = _build(OutputConfig, raw.get("output"), "output")
-    for section in (search, filters, transcripts):
+    for section in (search, filters, transcripts, writing):
         section.validate()
 
     niche = raw.get("niche") or {}
-    writing = raw.get("writing") or {}
-    if not isinstance(writing, dict):
-        raise ConfigError("'writing' must be a section of settings, not a single value.")
 
     load_dotenv(PROJECT_ROOT / ".env")
 
@@ -161,6 +201,7 @@ def load_settings(config_path: Optional[Path] = None) -> Settings:
         log_dir=_resolve(output.log_dir),
         youtube_api_key=_env("YOUTUBE_API_KEY"),
         transcript_proxy_url=_env("TRANSCRIPT_PROXY_URL"),
+        gemini_api_key=_env("GEMINI_API_KEY"),
     )
 
 

@@ -1,13 +1,13 @@
 # YouTube → Article Pipeline
 
-Finds YouTube videos in any niche, pulls their transcripts, and (in later steps) rewrites them into
-Substack-style article drafts with image prompts, ready to publish by hand.
+Finds YouTube videos in any niche, pulls their transcripts, and rewrites them into Substack-style article drafts
+with Gemini (free tier). Later steps add image prompts. You publish the drafts by hand.
 
 | Step | What it does | Status |
 |------|--------------|--------|
 | 1 | Search YouTube by keywords from `config.yaml` and filter results | ✅ built |
 | 2 | Download transcripts and save a draft folder per video | ✅ built |
-| 3 | Rewrite transcripts into articles with the Gemini free API | planned |
+| 3 | Rewrite transcripts into articles with the Gemini free API | ✅ built |
 | 4 | Generate thumbnail image prompts | planned |
 | 5 | Final draft folders for manual publishing | planned |
 
@@ -32,7 +32,7 @@ pip install -r requirements.txt
 cp .env.example .env               # Windows: copy .env.example .env
 ```
 
-Then open `.env` and paste your YouTube API key after `YOUTUBE_API_KEY=` (see the next section).
+Then open `.env` and paste your two keys after `YOUTUBE_API_KEY=` and `GEMINI_API_KEY=` (see the next two sections).
 
 Check that everything works:
 
@@ -62,7 +62,27 @@ No billing account is needed. The free quota is **10,000 units per day**, and it
 
 With 3 keywords and 25 results each, a run costs about 300 units, so you can run it ~30 times a day.
 
-## 3. Configure your niche
+## 3. Get a Gemini API key (free)
+
+1. Go to <https://aistudio.google.com/apikey> and sign in with your Google account.
+2. Click **Create API key**. Pick your existing Google Cloud project (or let it make one).
+3. Paste it into `.env`:
+   ```
+   GEMINI_API_KEY=AIzaSy...your-key...
+   ```
+
+**Don't enable billing** on that project. Without billing you stay on the free tier and can't be charged.
+Free-tier limits are per model and change often (roughly a few requests per minute and a limited number per day;
+check the limits shown in AI Studio). The pipeline handles them for you:
+
+- **per-minute limit**: it waits and tries again
+- **daily limit**: it switches to the next model in `writing.fallback_models`; when all are used up it stops
+  and leaves the remaining transcripts queued for tomorrow's run
+
+On the free tier Google may use prompts to improve its products. That's fine for public YouTube transcripts,
+but don't put private material through it.
+
+## 4. Configure your niche
 
 Open `config.yaml`. Every setting has a comment. The important ones:
 
@@ -82,11 +102,15 @@ transcripts:
   languages: ["en"]
   min_words: 400
 
-writing:          # used by step 3 (article writing)
+writing:
+  model: gemini-3.8-flash
+  fallback_models: [gemini-3.6-flash, gemini-3.5-flash-lite]
   audience: "..."
   tone: "..."
+  target_word_count: 1200
   instructions: |
-    ...
+    ...                        # your style guide: structure, voice, dos and don'ts
+  include_source_credit: true  # adds "Inspired by <video> by <channel>" at the end
 ```
 
 If you mistype a setting name, the pipeline tells you exactly which one is wrong.
@@ -98,12 +122,14 @@ own `output.database_path` and `output.drafts_dir`, then run it with `--config`:
 python main.py --config config.fitness.yaml run
 ```
 
-## 4. Running it
+## 5. Running it
 
 ```bash
 python main.py run --dry-run   # search + filter only: shows what would be processed, saves nothing
-python main.py run             # search, filter, download transcripts, save drafts
-python main.py status          # counts of done/failed videos and the latest errors
+python main.py run             # all steps: search, filter, transcripts, articles
+python main.py run --no-write  # stop after transcripts (no Gemini calls)
+python main.py write           # write articles for saved transcripts that don't have one yet
+python main.py status          # how many videos are at each step, and the latest errors
 python main.py retry           # try failed (or interrupted) videos again
 python main.py -v run          # same as run, but explains why each video was filtered out
 ```
@@ -118,22 +144,26 @@ drafts/
     metadata.json      # title, channel, URL, views, duration, keyword, transcript info
     transcript.txt     # clean transcript in ~1-minute paragraphs
     transcript.json    # raw caption lines with timestamps
+    article.md         # the finished article: title, subtitle, body, source credit
 ```
 
-Later steps will add `article.md` and image prompts to the same folder.
+The article's title, word count and the Gemini model used are also added to `metadata.json`.
+A later step will add image prompts to the same folder.
 
 ### How re-runs work
 
-Every video is recorded in a small SQLite database (`data/pipeline.db`) with a status:
+Every video is recorded in a small SQLite database (`data/pipeline.db`) with the step it reached
+(`transcript` or `article`) and a status:
 
-- **done**: transcript saved. Never processed again.
-- **failed**: something went wrong (no captions, too short, blocked...). Skipped by `run` and
-  picked up by `retry`. `python main.py status` shows the reason.
+- **done**: that step succeeded. A video with a transcript but no article yet is picked up by the
+  next `run` or `write`. Videos with a finished article are never processed again.
+- **failed**: something went wrong (no captions, transcript too short, Gemini refused...). Skipped by
+  `run` and picked up by `retry`. `python main.py status` shows the reason.
 - **pending**: work started but the run was interrupted (e.g. Ctrl+C). `retry` picks these up.
 
-So you can run `python main.py run` every day and only new videos get processed.
+So you can run `python main.py run` every day and only new work gets done.
 
-## 5. Project layout
+## 6. Project layout
 
 ```
 .
@@ -142,17 +172,18 @@ So you can run `python main.py run` every day and only new videos get processed.
 ├── .env.example               # template for your secrets (copy to .env)
 ├── requirements.txt
 └── article_pipeline/
-    ├── cli.py                 # commands: run, retry, status, check
+    ├── cli.py                 # commands: run, write, retry, status, check
     ├── config.py              # loads + validates config.yaml and .env
     ├── youtube_search.py      # step 1: YouTube Data API search + filters
     ├── transcripts.py         # step 2: transcripts + draft folders
+    ├── articles.py            # step 3: Gemini article writing
     ├── db.py                  # SQLite status tracking
     └── logging_setup.py       # console + file logging
 ```
 
 Generated (git-ignored): `.env`, `data/`, `drafts/`, `logs/`, `.venv/`.
 
-## 6. Troubleshooting
+## 7. Troubleshooting
 
 Full details of every run are written to `logs/pipeline.log`.
 
@@ -164,6 +195,10 @@ Full details of every run are written to `logs/pipeline.log`.
 | `daily quota is used up` | Wait until midnight Pacific time, or use fewer keywords/results. |
 | `YouTube is blocking transcript requests from your IP` | See below. |
 | `Captions are disabled` / `No transcript in languages` | Normal for some videos; they're marked failed and skipped. |
+| `GEMINI_API_KEY is not set` / `not valid` | Create a key at aistudio.google.com/apikey and paste it in `.env`. |
+| `All configured Gemini models have hit their free daily limit` | Wait until midnight Pacific time, then `python main.py write`. |
+| `Model '...' was not found` | Google renamed or retired the model. Pick a current one from the [models page](https://ai.google.dev/gemini-api/docs/models) and update `writing.model`. |
+| `Gemini blocked the request` / `answer was cut off` | That video is marked failed. `retry` tries again; lower `target_word_count` if it's cut off. |
 
 **Blocked transcript requests.** Transcripts aren't part of the official API. They're fetched the way
 the YouTube website loads them, and YouTube blocks IPs that look automated. This is common on **VPNs, cloud

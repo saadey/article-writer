@@ -1,8 +1,8 @@
 """SQLite tracking of processed videos.
 
 Each video has one row. `stage` is the last pipeline step attempted
-(only "transcript" for now; later steps add "article", "images", ...)
-and `status` is the result of that step: pending, done, or failed.
+("transcript", then "article"; later steps add more) and `status` is
+the result of that step: pending, done, or failed.
 """
 
 from __future__ import annotations
@@ -60,16 +60,16 @@ class Database:
 
     # ---- reads -------------------------------------------------------
 
-    def statuses(self, video_ids: Iterable[str]) -> dict:
-        """Map video_id -> status for the IDs that are already tracked."""
+    def tracked(self, video_ids: Iterable[str]) -> dict:
+        """Map video_id -> (stage, status) for the IDs that are already tracked."""
         ids = list(video_ids)
         if not ids:
             return {}
         placeholders = ",".join("?" * len(ids))
         rows = self.conn.execute(
-            f"SELECT video_id, status FROM videos WHERE video_id IN ({placeholders})", ids
+            f"SELECT video_id, stage, status FROM videos WHERE video_id IN ({placeholders})", ids
         ).fetchall()
-        return {r["video_id"]: r["status"] for r in rows}
+        return {r["video_id"]: (r["stage"], r["status"]) for r in rows}
 
     def retryable(self, stage: str = "transcript", limit: Optional[int] = None) -> list:
         """Failed videos, plus 'pending' ones left behind by an interrupted run."""
@@ -78,6 +78,15 @@ class Database:
             "ORDER BY updated_at"
         )
         params: list = [stage]
+        if limit:
+            sql += " LIMIT ?"
+            params.append(limit)
+        return self.conn.execute(sql, params).fetchall()
+
+    def ready_for_next(self, finished_stage: str, limit: Optional[int] = None) -> list:
+        """Videos whose `finished_stage` is done, i.e. waiting for the next step."""
+        sql = "SELECT * FROM videos WHERE stage = ? AND status = 'done' ORDER BY view_count DESC"
+        params: list = [finished_stage]
         if limit:
             sql += " LIMIT ?"
             params.append(limit)
@@ -131,6 +140,27 @@ class Database:
                 "stage": stage,
                 "now": now,
             },
+        )
+        self.conn.commit()
+
+    def start_stage(self, video_id: str, stage: str) -> None:
+        """Move a tracked video to `stage` as pending. Attempts count per stage."""
+        self.conn.execute(
+            """
+            UPDATE videos SET
+                attempts = CASE WHEN stage = ? THEN attempts + 1 ELSE 1 END,
+                stage = ?, status = 'pending', error = NULL, updated_at = ?
+            WHERE video_id = ?
+            """,
+            (stage, stage, _now(), video_id),
+        )
+        self.conn.commit()
+
+    def revert_to(self, video_id: str, stage: str) -> None:
+        """Undo start_stage when a run stops for reasons unrelated to this video (e.g. quota)."""
+        self.conn.execute(
+            "UPDATE videos SET stage = ?, status = 'done', error = NULL, updated_at = ? WHERE video_id = ?",
+            (stage, _now(), video_id),
         )
         self.conn.commit()
 

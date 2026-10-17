@@ -62,8 +62,15 @@ transcripts:
   # Pause between transcript requests to avoid being rate limited.
   delay_seconds: 2
 
-# ---- Step 3: Article writing (used in a later step) -----------
+# ---- Step 3: Article writing (Gemini) -------------------------
 writing:
+  # Free-tier Gemini models: https://ai.google.dev/gemini-api/docs/pricing
+  model: gemini-3.8-flash
+  # Tried in order when a model hits its free daily limit or is unavailable.
+  fallback_models:
+    - gemini-3.6-flash
+    - gemini-3.5-flash-lite
+
   audience: "Beginners in their 20s and 30s who want practical money advice"
   tone: "Friendly, clear, no hype. Write like a knowledgeable friend."
   target_word_count: 1200
@@ -74,6 +81,15 @@ writing:
     - Keep the creator's key ideas but write in your own words; never copy sentences.
     - End with a short summary and one actionable takeaway.
     - Do not mention "this video" or "the transcript".
+
+  # Add a "Inspired by <video> by <channel>" line at the end of each article.
+  include_source_credit: true
+  # 0 = predictable, 1+ = more creative.
+  temperature: 0.8
+  # Pause between articles to stay under the free per-minute limit.
+  delay_seconds: 5
+  # Free tier has a small daily request limit; keep runs modest.
+  max_articles_per_run: 10
 
 # ---- Where things are saved ----------------------------------
 # Relative paths are resolved from the project folder.

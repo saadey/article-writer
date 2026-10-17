@@ -276,13 +276,14 @@ def discover_videos(settings: Settings, client: YouTubeClient, db: Database) -> 
         log.info("No videos found for any keyword.")
         return []
 
-    tracked = db.statuses(keyword_for)
-    skipped = Counter(tracked.values())
-    # 'pending' means a previous run was interrupted mid-video, so process it again.
-    candidates = [vid for vid in keyword_for if tracked.get(vid) not in ("done", "failed")]
-    if skipped.get("done") or skipped.get("failed"):
+    tracked = db.tracked(keyword_for)
+    # A transcript left 'pending' means a previous run was interrupted mid-video: process it again.
+    candidates = [vid for vid in keyword_for if tracked.get(vid, ("transcript", "pending")) == ("transcript", "pending")]
+    skipped = Counter("failed" if status == "failed" else "done" for vid, (_, status) in tracked.items()
+                      if vid not in candidates)
+    if skipped:
         log.info(
-            "Skipping %d already done and %d previously failed (use 'retry' for failed ones).",
+            "Skipping %d already processed and %d previously failed (use 'retry' for failed ones).",
             skipped.get("done", 0), skipped.get("failed", 0),
         )
 

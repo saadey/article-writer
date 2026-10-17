@@ -8,12 +8,14 @@ import sys
 import time
 from pathlib import Path
 
+from .articles import ArticleError, GeminiClient, GeminiError, write_article
 from .config import ConfigError, Settings, load_settings
 from .db import Database
 from .logging_setup import get_logger, setup_logging
 from .transcripts import (
     TranscriptBlockedError,
     TranscriptError,
+    draft_folder,
     make_transcript_api,
     save_transcript_draft,
 )
@@ -33,15 +35,21 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Show debug detail (e.g. why each video was filtered out)")
     sub = parser.add_subparsers(dest="command", metavar="command")
 
-    run = sub.add_parser("run", help="Search YouTube for new videos and save their transcripts")
+    run = sub.add_parser("run", help="Find new videos, save transcripts, and write articles")
     run.add_argument("--dry-run", action="store_true",
                      help="Only list the videos that would be processed; save nothing")
+    run.add_argument("--no-write", action="store_true",
+                     help="Stop after saving transcripts (skip Gemini article writing)")
+
+    write = sub.add_parser("write", help="Write articles for saved transcripts that don't have one yet")
+    write.add_argument("--limit", type=int, default=None,
+                       help="Write at most this many (default: writing.max_articles_per_run)")
 
     retry = sub.add_parser("retry", help="Retry videos that failed (or were interrupted) earlier")
-    retry.add_argument("--limit", type=int, default=None, help="Retry at most this many videos")
+    retry.add_argument("--limit", type=int, default=None, help="Retry at most this many videos per step")
 
-    sub.add_parser("status", help="Show how many videos are done/failed, and recent errors")
-    sub.add_parser("check", help="Check config, .env and the YouTube API key")
+    sub.add_parser("status", help="Show how many videos are at each step, and recent errors")
+    sub.add_parser("check", help="Check config, .env and your API keys")
     return parser
 
 
@@ -64,7 +72,9 @@ def main(argv=None) -> int:
     try:
         with Database(settings.database_path) as db:
             if args.command == "run":
-                return cmd_run(settings, db, args.dry_run)
+                return cmd_run(settings, db, args.dry_run, args.no_write)
+            if args.command == "write":
+                return cmd_write(settings, db, args.limit)
             if args.command == "retry":
                 return cmd_retry(settings, db, args.limit)
             if args.command == "status":
@@ -74,7 +84,7 @@ def main(argv=None) -> int:
     except ConfigError as exc:
         log.error("Config problem: %s", exc)
         return 2
-    except YouTubeAPIError as exc:
+    except (YouTubeAPIError, GeminiError) as exc:
         log.error("%s", exc)
         return 1
     except KeyboardInterrupt:
@@ -83,8 +93,10 @@ def main(argv=None) -> int:
     return 0
 
 
-def cmd_run(settings: Settings, db: Database, dry_run: bool) -> int:
+def cmd_run(settings: Settings, db: Database, dry_run: bool, no_write: bool) -> int:
     log.info("Niche: %s | %d keyword(s)", settings.niche_name, len(settings.search.keywords))
+    if not (dry_run or no_write):
+        settings.require_gemini_key()  # fail now, not after downloading transcripts
     client = YouTubeClient(settings.require_youtube_key())
     videos = discover_videos(settings, client, db)
 
@@ -94,24 +106,43 @@ def cmd_run(settings: Settings, db: Database, dry_run: bool) -> int:
                      v.video_id, f"{v.view_count:,}", v.duration_seconds // 60, v.title)
         log.info("Dry run: nothing was saved.")
         return 0
-    return process_videos(settings, db, videos)
+    process_transcripts(settings, db, videos)
+    if no_write:
+        return 0
+    return cmd_write(settings, db, None)
+
+
+def cmd_write(settings: Settings, db: Database, limit) -> int:
+    limit = limit or settings.writing.max_articles_per_run
+    rows = db.ready_for_next("transcript", limit=limit)
+    if not rows:
+        log.info("No transcripts waiting for an article.")
+        return 0
+    return process_articles(settings, db, rows)
 
 
 def cmd_retry(settings: Settings, db: Database, limit) -> int:
-    rows = db.retryable(stage="transcript", limit=limit)
-    if not rows:
+    transcript_rows = db.retryable(stage="transcript", limit=limit)
+    article_rows = db.retryable(stage="article", limit=limit)
+    if not transcript_rows and not article_rows:
         log.info("Nothing to retry: no failed or pending videos.")
         return 0
-    log.info("Retrying %d video(s).", len(rows))
-    videos = [VideoInfo.from_dict(json.loads(row["metadata_json"])) for row in rows]
-    return process_videos(settings, db, videos)
+    if transcript_rows:
+        log.info("Retrying %d transcript(s).", len(transcript_rows))
+        videos = [VideoInfo.from_dict(json.loads(row["metadata_json"])) for row in transcript_rows]
+        process_transcripts(settings, db, videos)
+    if article_rows:
+        log.info("Retrying %d article(s).", len(article_rows))
+        process_articles(settings, db, article_rows)
+    return 0
 
 
-def process_videos(settings: Settings, db: Database, videos: list) -> int:
+def process_transcripts(settings: Settings, db: Database, videos: list) -> int:
     if not videos:
         log.info("No new videos to process.")
         return 0
 
+    log.info("Step 2: saving transcripts for %d video(s).", len(videos))
     api = make_transcript_api(settings.transcript_proxy_url)
     done = failed = 0
     for index, video in enumerate(videos, 1):
@@ -140,10 +171,61 @@ def process_videos(settings: Settings, db: Database, videos: list) -> int:
             done += 1
             log.info("  saved %s", _relative(folder))
 
-    log.info("Finished: %d saved, %d failed. Drafts are in %s", done, failed, _relative(settings.drafts_dir))
+    log.info("Transcripts: %d saved, %d failed.", done, failed)
     if failed:
         log.info("See failures with 'python main.py status'; retry them with 'python main.py retry'.")
     return 0
+
+
+def process_articles(settings: Settings, db: Database, rows: list) -> int:
+    cfg = settings.writing
+    client = GeminiClient(settings.require_gemini_key(), cfg.models)
+    log.info("Step 3: writing %d article(s) with %s.", len(rows), cfg.model)
+    done = failed = 0
+    for index, row in enumerate(rows, 1):
+        if index > 1 and cfg.delay_seconds:
+            time.sleep(cfg.delay_seconds)
+        video_id = row["video_id"]
+        folder = Path(row["draft_dir"]) if row["draft_dir"] else draft_folder(
+            settings.drafts_dir, VideoInfo.from_dict(json.loads(row["metadata_json"]))
+        )
+        log.info("[%d/%d] %s | %s", index, len(rows), video_id, row["title"])
+        db.start_stage(video_id, "article")
+        try:
+            article = write_article(client, folder, cfg, settings.niche_name)
+        except GeminiError as exc:
+            # Not this video's fault (quota, bad key): leave it queued for the next run.
+            db.revert_to(video_id, "transcript")
+            log.error("%s", exc)
+            log.error("Stopping this run early. %d article(s) left for next time.", len(rows) - index + 1)
+            break
+        except ArticleError as exc:
+            db.mark_failed(video_id, str(exc))
+            failed += 1
+            log.warning("  failed: %s", exc)
+        except Exception as exc:
+            db.mark_failed(video_id, f"Unexpected error: {type(exc).__name__}: {exc}")
+            failed += 1
+            log.exception("  unexpected error")
+        else:
+            db.mark_done(video_id, folder)
+            done += 1
+            log.info("  wrote %s", _relative(article))
+
+    log.info("Articles: %d written, %d failed. Drafts are in %s", done, failed, _relative(settings.drafts_dir))
+    if failed:
+        log.info("See failures with 'python main.py status'; retry them with 'python main.py retry'.")
+    return 0
+
+
+STAGE_LABELS = {
+    ("transcript", "done"): "transcript saved, waiting for article",
+    ("transcript", "failed"): "transcript failed",
+    ("transcript", "pending"): "transcript interrupted",
+    ("article", "done"): "article written",
+    ("article", "failed"): "article failed",
+    ("article", "pending"): "article interrupted",
+}
 
 
 def cmd_status(db: Database) -> int:
@@ -151,14 +233,14 @@ def cmd_status(db: Database) -> int:
     if not counts:
         print("No videos tracked yet. Run: python main.py run")
         return 0
-    print("Videos by step and status:")
+    print("Videos:")
     for (stage, status), n in sorted(counts.items()):
-        print(f"  {stage:<12} {status:<8} {n}")
+        print(f"  {n:>4}  {STAGE_LABELS.get((stage, status), f'{stage} {status}')}")
     failures = db.recent_failures()
     if failures:
         print("\nRecent failures:")
         for row in failures:
-            print(f"  {row['video_id']}  (attempts: {row['attempts']})  {row['title']}")
+            print(f"  {row['video_id']}  [{row['stage']}, attempts: {row['attempts']}]  {row['title']}")
             print(f"      {row['error']}")
     return 0
 
@@ -168,6 +250,13 @@ def cmd_check(settings: Settings) -> int:
     client = YouTubeClient(settings.require_youtube_key())
     client.video_details(["dQw4w9WgXcQ"])  # 1 quota unit; raises a friendly error if the key is bad
     log.info("YouTube API key OK.")
+    if settings.gemini_api_key:
+        gemini = GeminiClient(settings.gemini_api_key, settings.writing.models)
+        for model in settings.writing.models:
+            gemini.check_model(model)  # free metadata request, uses no quota
+        log.info("Gemini API key OK (models: %s).", ", ".join(settings.writing.models))
+    else:
+        log.warning("GEMINI_API_KEY is not set yet; needed for article writing (step 3).")
     if settings.transcript_proxy_url:
         log.info("Transcript proxy is configured.")
     return 0

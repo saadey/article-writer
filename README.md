@@ -109,7 +109,7 @@ writing:
   tone: ""                     # leave empty if your instructions file covers tone
   target_word_count: 1200
   instructions_file: prompts/article_instructions.md
-  include_source_credit: true  # adds "Inspired by <video> by <channel>" at the end
+  include_source_credit: false # true adds "Inspired by <video> by <channel>" at the end
 ```
 
 If you mistype a setting name, the pipeline tells you exactly which one is wrong.

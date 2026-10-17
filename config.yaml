@@ -83,8 +83,9 @@ writing:
   # under `instructions: |` instead.)
   instructions_file: prompts/article_instructions.md
 
-  # Add a "Inspired by <video> by <channel>" line at the end of each article.
-  include_source_credit: true
+  # true adds an "Inspired by <video> by <channel>" line at the end of each article.
+  # The source link is always kept in editor_notes.md and metadata.json either way.
+  include_source_credit: false
   # 0 = predictable, 1+ = more creative.
   temperature: 0.8
   # Pause between articles to stay under the free per-minute limit.

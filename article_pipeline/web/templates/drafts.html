@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Drafts · {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Drafts</h1>
+  {% if rows %}
+  <a class="btn" href="{{ url_for('export_zip', pid=project.id, view=view) }}">Download these as .zip</a>
+  {% endif %}
+</div>
+
+<nav class="tabs">
+  {% for key, label in views %}
+  <a href="{{ url_for('drafts', pid=project.id, view=key) }}" class="{{ 'active' if key == view }}">{{ label }} <span class="count">{{ view_counts[key] }}</span></a>
+  {% endfor %}
+</nav>
+
+{% if rows %}
+<div class="table-wrap">
+<table class="table">
+  <thead><tr><th>Article</th><th>Status</th><th class="num hide-sm">Words</th><th class="num hide-sm">Claims to check</th><th class="hide-sm">Updated</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    {% set b = badge(r) %}
+    <tr>
+      <td><a href="{{ url_for('draft', pid=project.id, vid=r.id) }}" class="row-title">{{ r.article_title or r.title }}</a>
+        <span class="muted small">from {{ r.channel_title }}{% if r.view_count %} · {{ '{:,}'.format(r.view_count) }} views{% endif %}</span></td>
+      <td><span class="badge badge-{{ b[1] }}">{{ b[0] }}</span></td>
+      <td class="num hide-sm">{{ r.article_words or '' }}</td>
+      <td class="num hide-sm">{% if r.article_body %}{{ r.flagged_claims_json|json_len }}{% endif %}</td>
+      <td class="muted small hide-sm">{{ ago(r.updated_at) }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="empty">
+  {% if view == 'ready' %}Nothing is ready yet. <a href="{{ url_for('dashboard', pid=project.id) }}">Run the pipeline</a> to create drafts.
+  {% elif view == 'failed' %}No failures.
+  {% else %}Nothing here.{% endif %}
+</div>
+{% endif %}
+{% endblock %}

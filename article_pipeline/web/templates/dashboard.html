@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} · Article Writer{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ project.name }}</h1>
+    <p class="muted">
+      {% if keywords %}Searching for {{ keywords[:3]|join(', ') }}{% if keywords|length > 3 %} and {{ keywords|length - 3 }} more{% endif %}.
+      {% else %}No keywords yet.{% endif %}
+      <a href="{{ url_for('settings_page', pid=project.id) }}">Edit settings</a>
+    </p>
+  </div>
+</div>
+
+<section class="stats">
+  <a class="stat stat-ready" href="{{ url_for('drafts', pid=project.id, view='ready') }}">
+    <span class="stat-n">{{ counts.ready }}</span><span class="stat-l">Ready to publish</span></a>
+  <a class="stat" href="{{ url_for('drafts', pid=project.id, view='progress') }}">
+    <span class="stat-n">{{ counts.progress }}</span><span class="stat-l">In progress</span></a>
+  <a class="stat" href="{{ url_for('drafts', pid=project.id, view='published') }}">
+    <span class="stat-n">{{ counts.published }}</span><span class="stat-l">Published</span></a>
+  <a class="stat {{ 'stat-failed' if counts.failed }}" href="{{ url_for('drafts', pid=project.id, view='failed') }}">
+    <span class="stat-n">{{ counts.failed }}</span><span class="stat-l">Failed</span></a>
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <h2>Run the pipeline</h2>
+    {% set running = job and job.status == 'running' %}
+    <form method="post" action="{{ url_for('start', pid=project.id) }}" class="primary-action">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="kind" value="run">
+      <button class="btn btn-primary btn-big" {{ 'disabled' if running }}>Run everything</button>
+      <p class="muted small">Finds new videos, saves transcripts, then writes articles and image prompts.
+        Each article takes a few minutes.</p>
+    </form>
+    <div class="action-list">
+      {% for kind, title, text in [
+        ('write', 'Continue writing', 'Articles and image prompts for videos that already have transcripts.'),
+        ('transcripts', 'Find videos only', 'Search and save transcripts, without using Gemini.'),
+        ('retry', 'Retry failed', 'Try failed or interrupted videos again.'),
+        ('preview', 'Preview search', 'Show what a search would find. Saves nothing.'),
+      ] %}
+      <form method="post" action="{{ url_for('start', pid=project.id) }}" class="action-row">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="kind" value="{{ kind }}">
+        <div><strong>{{ title }}</strong><span class="muted small">{{ text }}</span></div>
+        <button class="btn" {{ 'disabled' if running }}>Start</button>
+      </form>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Live progress</h2>
+    {% if job and job.project_id == project.id %}
+      <p class="small"><strong data-job-label>{{ job.label }}</strong> · started {{ job.started }} ·
+        <span class="status status-{{ job.status }}" data-job-status>{{ job.status }}</span></p>
+      <pre class="log" id="job-log" data-autoreload>{% for line in job.lines %}<span class="log-{{ line.level }}">{{ line.text }}</span>
+{% endfor %}</pre>
+      <p class="small muted" data-job-summary>{{ job.summary }}</p>
+    {% else %}
+      <p class="muted">Nothing running. Start a task and its progress appears here.</p>
+    {% endif %}
+  </section>
+</div>
+
+<div class="grid-2">
+  <section class="card">
+    <h2>Recent activity</h2>
+    {% if jobs %}
+    <ul class="list">
+      {% for j in jobs %}
+      <li><a href="{{ url_for('activity_log', pid=project.id, jid=j.id) }}">{{ job_labels.get(j.kind, j.kind) }}</a>
+        <span class="status status-{{ j.status }}">{{ j.status }}</span>
+        <span class="muted small">{{ ago(j.started_at) }}{% if j.summary %} · {{ j.summary }}{% endif %}</span></li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="muted">No tasks yet.</p>{% endif %}
+  </section>
+  <section class="card">
+    <h2>Recent failures</h2>
+    {% if failures %}
+    <ul class="list">
+      {% for f in failures %}
+      <li><a href="{{ url_for('draft', pid=project.id, vid=f.id) }}">{{ f.title }}</a>
+        <span class="muted small">{{ f.stage }} step: {{ f.error }}</span></li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="muted">No failures.</p>{% endif %}
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Prompts · {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Prompts</h1>
+  <p class="muted">Your instructions to the AI for <strong>{{ project.name }}</strong>. The app adds the topic,
+  audience, target length and the answer format automatically, so write only the editorial part.
+  Changes apply to the next article; use <em>Rewrite</em> on a draft to try them.</p></div></div>
+{% for which, title, column, help in [
+  ('article', 'Article instructions', 'article_instructions', 'How articles are written: titles, structure, tone, what to remove, style rules.'),
+  ('image', 'Image prompt instructions', 'image_instructions', 'Visual style and rules for the image prompts.'),
+] %}
+<section class="card" id="{{ which }}">
+  <h2>{{ title }}</h2>
+  <p class="muted small">{{ help }}</p>
+  <form method="post" class="form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="which" value="{{ which }}">
+    <textarea name="text" rows="{{ 22 if which == 'article' else 14 }}" class="mono">{{ project[column] }}</textarea>
+    <div class="form-actions">
+      <button class="btn btn-primary">Save</button>
+      <button class="btn btn-ghost" name="reset" value="1" data-confirm-click="Replace this prompt with the default from the prompts/ folder?">Reset to default</button>
+    </div>
+  </form>
+</section>
+{% endfor %}
+{% endblock %}

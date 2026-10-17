@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Settings · {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Settings</h1>
+  <p class="muted">For <strong>{{ project.name }}</strong>. The writing and image instructions are on the
+  <a href="{{ url_for('prompts_page', pid=project.id) }}">Prompts</a> page.</p></div></div>
+<form method="post" class="form settings-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  {% for title, intro, fields in form %}
+  <section class="card">
+    <h2>{{ title }}</h2>
+    {% if intro %}<p class="muted small">{{ intro }}</p>{% endif %}
+    <div class="fields">
+    {% for key, label, kind, help in fields %}
+      {% set v = field_value(values, key) %}
+      <div class="field {{ 'field-wide' if kind == 'lines' }}">
+        {% if kind == 'bool' %}
+          <label class="check"><input type="checkbox" name="{{ key }}" {{ 'checked' if v }}> {{ label }}</label>
+        {% else %}
+          <label for="{{ key }}">{{ label }}</label>
+          {% if kind == 'lines' %}
+            <textarea id="{{ key }}" name="{{ key }}" rows="{{ 5 if key == 'search.keywords' else 3 }}">{{ display_value(v, kind) }}</textarea>
+          {% elif kind is not string %}
+            <select id="{{ key }}" name="{{ key }}">{% for c in kind %}<option {{ 'selected' if c == v }}>{{ c }}</option>{% endfor %}</select>
+          {% else %}
+            <input id="{{ key }}" name="{{ key }}" value="{{ display_value(v, kind) }}"
+                   {% if kind in ('int', 'float') %}inputmode="decimal"{% endif %}>
+          {% endif %}
+        {% endif %}
+        {% if help %}<span class="help">{{ help }}</span>{% endif %}
+      </div>
+    {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+  <div class="form-actions sticky-actions"><button class="btn btn-primary">Save settings</button></div>
+</form>
+{% endblock %}

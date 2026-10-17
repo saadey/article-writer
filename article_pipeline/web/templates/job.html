@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Task log · Article Writer{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{{ url_for('activity', pid=project.id) }}">Activity</a> /</p>
+<div class="page-head"><div><h1>{{ job_labels.get(j.kind, j.kind) }}</h1>
+  <p class="muted small"><span class="status status-{{ j.status }}">{{ j.status }}</span> · started {{ ago(j.started_at) }}
+  {% if j.summary %} · {{ j.summary }}{% endif %}</p></div></div>
+{% if j.status == 'running' %}<p class="muted">This task is still running; its live log is on the <a href="{{ url_for('dashboard', pid=project.id) }}">dashboard</a>.</p>
+{% else %}<pre class="log log-tall">{{ j.log or 'No log was recorded.' }}</pre>{% endif %}
+{% endblock %}

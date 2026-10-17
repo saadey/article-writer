@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}{{ row.article_title or row.title }} · Article Writer{% endblock %}
+{% block content %}
+{% set b = badge(row) %}
+<p class="crumbs"><a href="{{ url_for('drafts', pid=project.id) }}">Drafts</a> /</p>
+<div class="page-head draft-head">
+  <div>
+    <h1>{{ row.article_title or row.title }}</h1>
+    {% if row.article_subtitle %}<p class="subtitle">{{ row.article_subtitle }}</p>{% endif %}
+    <p class="muted small">
+      <span class="badge badge-{{ b[1] }}">{{ b[0] }}</span>
+      Source: <a href="{{ row.url }}" target="_blank" rel="noopener">{{ row.title }}</a> by {{ row.channel_title }}
+      {% if row.article_words %} · {{ row.article_words }} words{% endif %}
+      {% if row.posted_at %} · published {{ ago(row.posted_at) }}{% endif %}
+    </p>
+  </div>
+</div>
+
+{% if row.status == 'failed' %}
+<div class="notice error"><strong>The {{ row.stage }} step failed:</strong> {{ row.error }}
+  {% if row.stage == 'transcript' %}Use <em>Retry failed</em> on the dashboard to try again.{% endif %}</div>
+{% endif %}
+
+<div class="toolbar">
+  {% if row.article_body %}
+  <button type="button" class="btn btn-primary" data-copy-html="#article-render">Copy article for Substack</button>
+  <button type="button" class="btn" data-copy-text="{{ row.article_title }}">Copy title</button>
+  {% if row.article_subtitle %}<button type="button" class="btn" data-copy-text="{{ row.article_subtitle }}">Copy subtitle</button>{% endif %}
+  {% endif %}
+  {% if row.stage == 'images' and row.status == 'done' %}
+  <form method="post" action="{{ url_for('mark_posted', pid=project.id, vid=row.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="posted" value="1">
+    <button class="btn btn-good">Mark as published</button></form>
+  {% elif row.stage == 'published' %}
+  <form method="post" action="{{ url_for('mark_posted', pid=project.id, vid=row.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="posted" value="0">
+    <button class="btn">Move back to ready</button></form>
+  {% endif %}
+  <span class="spacer"></span>
+  <details class="menu">
+    <summary class="btn">More</summary>
+    <div class="menu-body">
+      {% if row.transcript_text and row.stage != 'published' %}
+      <form method="post" action="{{ url_for('regenerate', pid=project.id, vid=row.id) }}"
+            data-confirm="{{ 'Rewrite the article and image prompts? Your manual edits will be replaced.' if row.article_body else 'Write the article and image prompts now?' }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="what" value="article">
+        <button {{ 'disabled' if busy }}>{{ 'Rewrite article + image prompts' if row.article_body else 'Write article + image prompts' }}</button></form>
+      {% endif %}
+      {% if row.article_body and row.stage != 'published' %}
+      <form method="post" action="{{ url_for('regenerate', pid=project.id, vid=row.id) }}"
+            data-confirm="Write new image prompts? The current ones will be replaced.">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="what" value="images">
+        <button {{ 'disabled' if busy }}>Rewrite image prompts</button></form>
+      {% endif %}
+      <a href="{{ url_for('download_file', pid=project.id, vid=row.id, name='zip') }}">Download all files (.zip)</a>
+      {% if row.article_body %}<a href="{{ url_for('download_file', pid=project.id, vid=row.id, name='article.md') }}">Download article.md</a>{% endif %}
+      <form method="post" action="{{ url_for('delete_draft', pid=project.id, vid=row.id) }}"
+            data-confirm="Delete this draft and everything saved for it? This can't be undone.">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="danger">Delete draft</button></form>
+    </div>
+  </details>
+</div>
+
+<nav class="tabs" data-tabs>
+  {% for key, label in [('article', 'Article'), ('notes', 'Titles & notes'), ('images', 'Image prompts'), ('transcript', 'Transcript'), ('source', 'Source')] %}
+  <a href="?tab={{ key }}" data-tab="{{ key }}" class="{{ 'active' if tab == key }}">{{ label }}
+    {% if key == 'notes' and claims %}<span class="count count-warn">{{ claims|length }}</span>{% endif %}</a>
+  {% endfor %}
+</nav>
+
+<section class="tab-panel {{ 'hidden' if tab != 'article' }}" data-panel="article">
+  {% if row.article_body %}
+  <div class="article-wrap">
+    <article class="prose" id="article-render">{{ article_html|safe }}</article>
+    <details class="card edit-box">
+      <summary><strong>Edit article</strong> <span class="muted small">(Markdown)</span></summary>
+      <form method="post" action="{{ url_for('save_draft', pid=project.id, vid=row.id) }}" class="form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label>Title<input name="title" value="{{ row.article_title }}" required></label>
+        <label>Subtitle<input name="subtitle" value="{{ row.article_subtitle or '' }}"></label>
+        <label>Article<textarea name="body" rows="24" required>{{ row.article_body }}</textarea></label>
+        <div class="form-actions"><button class="btn btn-primary">Save changes</button>
+          <button type="button" class="btn" data-copy-text="{{ article_md }}">Copy as Markdown</button></div>
+      </form>
+    </details>
+  </div>
+  {% else %}
+  <div class="empty">No article yet.{% if row.transcript_text %} Use <em>More → Write article + image prompts</em>, or <em>Continue writing</em> on the dashboard.{% endif %}</div>
+  {% endif %}
+</section>
+
+<section class="tab-panel {{ 'hidden' if tab != 'notes' }}" data-panel="notes">
+  {% if row.article_body %}
+  <div class="card">
+    <h2>Title options</h2>
+    <ul class="list">
+      {% for t in title_options %}
+      <li class="title-option">
+        <div><span><strong>{{ t.title }}</strong>{% if t.recommended %} <span class="badge badge-ready">Recommended</span>{% endif %}
+          {% if t.title == row.article_title %} <span class="badge">In use</span>{% endif %}</span>
+          {% if t.reason %}<span class="muted small">{{ t.reason }}</span>{% endif %}</div>
+        {% if t.title != row.article_title %}
+        <form method="post" action="{{ url_for('use_title', pid=project.id, vid=row.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="title" value="{{ t.title }}">
+          <button class="btn btn-small">Use this title</button></form>
+        {% endif %}
+      </li>
+      {% else %}<li class="muted">No title options were returned.</li>{% endfor %}
+    </ul>
+  </div>
+  <div class="card">
+    <h2>Claims to check before publishing</h2>
+    {% if claims %}<ul class="claims">{% for c in claims %}<li>{{ c }}</li>{% endfor %}</ul>
+    {% else %}<p class="muted">None flagged.</p>{% endif %}
+  </div>
+  <div class="card">
+    <h2>What was removed and how it's structured</h2>
+    <p>{{ row.editor_notes or 'No notes.' }}</p>
+    <p class="muted small">Written by {{ row.article_model }} · {{ ago(row.article_at) }}</p>
+  </div>
+  {% else %}<div class="empty">Notes appear once the article is written.</div>{% endif %}
+</section>
+
+<section class="tab-panel {{ 'hidden' if tab != 'images' }}" data-panel="images">
+  {% for p in image_prompts %}
+  <div class="card prompt-card">
+    <div class="prompt-head"><h2>{{ loop.index }}. {{ p.placement }}</h2>
+      <button type="button" class="btn btn-small" data-copy-text="{{ p.prompt }}">Copy prompt</button></div>
+    <p class="prompt-text">{{ p.prompt }}</p>
+    <p class="small"><strong>Alt text:</strong> {{ p.alt_text }}
+      <button type="button" class="link-btn" data-copy-text="{{ p.alt_text }}">copy</button></p>
+  </div>
+  {% else %}
+  <div class="empty">No image prompts yet.</div>
+  {% endfor %}
+  {% if image_prompts %}<p class="muted small">Paste into ChatGPT, Gemini, Midjourney or another image tool. Written by {{ row.images_model }} · {{ ago(row.images_at) }}</p>{% endif %}
+</section>
+
+<section class="tab-panel {{ 'hidden' if tab != 'transcript' }}" data-panel="transcript">
+  {% if row.transcript_text %}
+  <p class="muted small">{{ info.word_count }} words · {{ info.language }}{% if info.translated %} (translated){% endif %}</p>
+  <div class="card transcript">{% for para in row.transcript_text.split('\n\n') %}<p>{{ para }}</p>{% endfor %}</div>
+  {% else %}<div class="empty">No transcript saved.</div>{% endif %}
+</section>
+
+<section class="tab-panel {{ 'hidden' if tab != 'source' }}" data-panel="source">
+  <div class="card">
+    <table class="kv">
+      <tr><th>Video</th><td><a href="{{ row.url }}" target="_blank" rel="noopener">{{ row.title }}</a></td></tr>
+      <tr><th>Channel</th><td>{{ row.channel_title }}</td></tr>
+      <tr><th>Views</th><td>{{ '{:,}'.format(row.view_count or 0) }}</td></tr>
+      <tr><th>Length</th><td>{{ (row.duration_sec or 0) // 60 }} min</td></tr>
+      <tr><th>Published on YouTube</th><td>{{ (row.published_at or '')[:10] }}</td></tr>
+      <tr><th>Found with keyword</th><td>{{ row.keyword }}</td></tr>
+      <tr><th>Video ID</th><td><code>{{ row.video_id }}</code></td></tr>
+      <tr><th>Step / status</th><td>{{ row.stage }} / {{ row.status }} (attempt {{ row.attempts }})</td></tr>
+    </table>
+  </div>
+</section>
+{% endblock %}

@@ -1,12 +1,10 @@
-"""Step 2: fetch transcripts and save each video as a draft folder."""
+"""Step 2: fetch a video's transcript and clean it into readable text."""
 
 from __future__ import annotations
 
-import json
 import re
 import unicodedata
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Optional
 
 from youtube_transcript_api import (
@@ -21,7 +19,6 @@ from youtube_transcript_api import (
 from youtube_transcript_api.proxies import GenericProxyConfig
 
 from .config import TranscriptConfig
-from .youtube_search import VideoInfo
 
 # Caption noise like [Music], [Applause], (laughs)
 _NOISE_RE = re.compile(r"[\[(](?:music|applause|laughter|laughs|inaudible|silence)[\])]", re.I)
@@ -78,7 +75,7 @@ def fetch_transcript(api: YouTubeTranscriptApi, video_id: str, cfg: TranscriptCo
     except RequestBlocked:
         raise TranscriptBlockedError(
             "YouTube is blocking transcript requests from your IP (too many requests, or a "
-            "cloud/VPN IP). Wait a few hours, switch network, or set TRANSCRIPT_PROXY_URL in .env."
+            "cloud/VPN IP). Wait a few hours, switch network, or add a transcript proxy on the API keys page."
         )
     except CouldNotRetrieveTranscript as exc:
         cause = (exc.cause or "").strip().splitlines()
@@ -122,41 +119,21 @@ def slugify(text: str, max_length: int = 60) -> str:
     return text[:max_length].rstrip("-") or "video"
 
 
-def draft_folder(drafts_dir: Path, video: VideoInfo) -> Path:
-    return drafts_dir / f"{slugify(video.title)}-{video.video_id}"
-
-
-def save_transcript_draft(
-    api: YouTubeTranscriptApi, video: VideoInfo, cfg: TranscriptConfig, drafts_dir: Path
-) -> Path:
-    """Fetch the transcript and write the video's draft folder. Returns the folder path."""
-    result = fetch_transcript(api, video.video_id, cfg)
+def get_transcript(api: YouTubeTranscriptApi, video_id: str, cfg: TranscriptConfig) -> tuple:
+    """Fetch and clean a transcript. Returns (text, segments, info)."""
+    result = fetch_transcript(api, video_id, cfg)
     text = segments_to_text(result["segments"])
     word_count = len(text.split())
     if word_count < cfg.min_words:
         raise TranscriptError(
-            f"Transcript too short ({word_count} words; transcripts.min_words is {cfg.min_words})."
+            f"Transcript too short ({word_count} words; the minimum is {cfg.min_words})."
         )
-
-    folder = draft_folder(drafts_dir, video)
-    folder.mkdir(parents=True, exist_ok=True)
-
-    (folder / "transcript.txt").write_text(text + "\n", encoding="utf-8")
-    (folder / "transcript.json").write_text(
-        json.dumps(result["segments"], ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    metadata = {
-        **video.to_dict(),
-        "transcript": {
-            "language_code": result["language_code"],
-            "language": result["language"],
-            "is_generated": result["is_generated"],
-            "translated": result["translated"],
-            "word_count": word_count,
-            "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        },
+    info = {
+        "language_code": result["language_code"],
+        "language": result["language"],
+        "is_generated": result["is_generated"],
+        "translated": result["translated"],
+        "word_count": word_count,
+        "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
-    (folder / "metadata.json").write_text(
-        json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    return folder
+    return text, result["segments"], info

@@ -1,10 +1,9 @@
 # ============================================================
-#  Niche configuration
-#  Everything about *what* the pipeline looks for and *how* it
-#  writes lives here. Change this file to switch niches; no code
-#  changes needed. To run several niches side by side, copy this
-#  file (e.g. config.fitness.yaml), give it its own database_path
-#  and drafts_dir, and run:  python main.py --config config.fitness.yaml run
+#  Starter project
+#  On the app's first launch (python app.py) this file becomes your
+#  first project. After that, change settings in the app: this file
+#  is not read again. You can also create a project from a file like
+#  this one with:  python main.py import-config my-niche.yaml
 # ============================================================
 
 niche:
@@ -82,10 +81,7 @@ writing:
   tone: ""
   target_word_count: 1200
 
-  # Your full instruction set for the AI writer (plain text/Markdown file).
-  # Edit that file to change how articles are written. Each niche can
-  # point to its own file. (Or delete this line and put the text inline
-  # under `instructions: |` instead.)
+  # Starting instructions for the AI writer (edit them later on the app's Prompts page).
   instructions_file: prompts/article_instructions.md
 
   # true adds an "Inspired by <video> by <channel>" line at the end of each article.
@@ -109,10 +105,3 @@ images:
   # Width:height. 16:9 suits most post headers and social previews.
   aspect_ratio: "16:9"
   temperature: 1.0
-
-# ---- Where things are saved ----------------------------------
-# Relative paths are resolved from the project folder.
-output:
-  drafts_dir: drafts
-  database_path: data/pipeline.db
-  log_dir: logs

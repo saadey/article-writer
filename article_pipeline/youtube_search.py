@@ -159,7 +159,7 @@ def _friendly_error(status: int, reason: str, message: str) -> str:
             "Lower search.keywords or max_results_per_keyword to use less quota."
         )
     if reason in ("keyInvalid", "badRequest") and "API key" in message:
-        return "Your YOUTUBE_API_KEY is not valid. Check the value in .env (no quotes or spaces)."
+        return "Your YouTube API key is not valid. Paste it again on the API keys page."
     if reason == "accessNotConfigured" or "has not been used in project" in message:
         return (
             "YouTube Data API v3 is not enabled for your Google Cloud project. "
@@ -276,7 +276,7 @@ def discover_videos(settings: Settings, client: YouTubeClient, db: Database) -> 
         log.info("No videos found for any keyword.")
         return []
 
-    tracked = db.tracked(keyword_for)
+    tracked = db.tracked(settings.project_id, keyword_for)
     # A transcript left 'pending' means a previous run was interrupted mid-video: process it again.
     candidates = [vid for vid in keyword_for if tracked.get(vid, ("transcript", "pending")) == ("transcript", "pending")]
     skipped = Counter("failed" if status == "failed" else "done" for vid, (_, status) in tracked.items()

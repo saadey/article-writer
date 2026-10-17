@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}API keys · Article Writer{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>API keys</h1>
+  <p class="muted">Saved in the <code>.env</code> file on this computer only, never in the database or on GitHub.
+  Shared by all projects. Leave a field empty to keep the saved key.</p></div></div>
+<form method="post" class="form card">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  {% for name, label, help in [
+    ('YOUTUBE_API_KEY', 'YouTube Data API key', 'Free from Google Cloud Console: create a project, enable "YouTube Data API v3", then Credentials → Create credentials → API key. See the README for step by step help.'),
+    ('GEMINI_API_KEY', 'Gemini API key', 'Free from aistudio.google.com/apikey. Do not enable billing, so you stay on the free tier.'),
+    ('TRANSCRIPT_PROXY_URL', 'Transcript proxy (optional)', 'Only if YouTube blocks your transcript requests. Format: http://user:pass@host:port'),
+  ] %}
+  <div class="field">
+    <label for="{{ name }}">{{ label }}
+      {% if saved[name] %}<span class="badge badge-ready">saved: {{ saved[name] }}</span>{% elif name != 'TRANSCRIPT_PROXY_URL' %}<span class="badge badge-failed">not set</span>{% endif %}</label>
+    <input id="{{ name }}" name="{{ name }}" type="password" autocomplete="off" placeholder="{{ 'Paste a new value to replace the saved one' if saved[name] else 'Paste here' }}">
+    <span class="help">{{ help }}</span>
+    {% if saved[name] %}<label class="check small"><input type="checkbox" name="clear_{{ name }}" data-clear-for="{{ name }}"> Remove the saved value</label>{% endif %}
+  </div>
+  {% endfor %}
+  <div class="form-actions">
+    <button class="btn btn-primary" name="check" value="1">Save and test keys</button>
+    <button class="btn">Save</button>
+  </div>
+</form>
+{% endblock %}

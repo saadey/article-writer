@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Activity · {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Activity</h1></div>
+{% if jobs %}
+<div class="table-wrap card">
+<table class="table">
+  <thead><tr><th>Task</th><th>Status</th><th>Result</th><th>Started</th></tr></thead>
+  <tbody>{% for j in jobs %}
+  <tr><td><a class="row-title" href="{{ url_for('activity_log', pid=project.id, jid=j.id) }}">{{ job_labels.get(j.kind, j.kind) }}</a></td>
+    <td><span class="status status-{{ j.status }}">{{ j.status }}</span></td>
+    <td class="small">{{ j.summary or '' }}</td><td class="muted small">{{ ago(j.started_at) }}</td></tr>
+  {% endfor %}</tbody>
+</table>
+</div>
+{% else %}<div class="empty">No tasks yet.</div>{% endif %}
+{% endblock %}

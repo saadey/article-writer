@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Projects · Article Writer{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Projects</h1>
+  <p class="muted">One project per niche. Each has its own keywords, filters, prompts and drafts.</p></div></div>
+<div class="table-wrap card">
+<table class="table">
+  <thead><tr><th>Project</th><th class="num">Ready</th><th class="num hide-sm">In progress</th><th class="num hide-sm">Published</th><th class="num hide-sm">Failed</th><th></th></tr></thead>
+  <tbody>
+  {% for p, c in rows %}
+  <tr>
+    <td><a class="row-title" href="{{ url_for('dashboard', pid=p.id) }}">{{ p.name }}</a></td>
+    <td class="num">{{ c.ready }}</td><td class="num hide-sm">{{ c.progress }}</td><td class="num hide-sm">{{ c.published }}</td><td class="num hide-sm">{{ c.failed }}</td>
+    <td class="row-actions">
+      <details class="menu"><summary class="btn btn-small">Manage</summary>
+        <div class="menu-body menu-wide">
+          <form method="post" action="{{ url_for('rename_project', pid=p.id) }}" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input name="name" value="{{ p.name }}" aria-label="New name"><button class="btn btn-small">Rename</button></form>
+          <form method="post" action="{{ url_for('delete_project', pid=p.id) }}" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input name="confirm_name" placeholder="Type the name to delete" aria-label="Confirm name">
+            <button class="btn btn-small btn-danger">Delete</button></form>
+          <p class="help">Deleting removes the project and all its drafts.</p>
+        </div>
+      </details>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<section class="card">
+  <h2>New project</h2>
+  <form method="post" action="{{ url_for('new_project') }}" class="form inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input name="name" placeholder="Project name, e.g. Fitness" required aria-label="Project name">
+    <select name="copy_from" aria-label="Start from">
+      <option value="">Start from defaults</option>
+      {% for p, c in rows %}<option value="{{ p.id }}">Copy settings + prompts from {{ p.name }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-primary">Create</button>
+  </form>
+</section>
+{% endblock %}

@@ -41,6 +41,7 @@ class GeminiClient:
         self.timeout = timeout
         self.max_retries = max_retries
         self.session = requests.Session()
+        self.sleep = time.sleep  # the app swaps this for a cancellable wait
 
     def generate_json(self, system: str, prompt: str, schema: dict, temperature: float) -> tuple:
         """Return (parsed_json, model_used), falling back through models on quota/availability."""
@@ -92,7 +93,7 @@ class GeminiClient:
                     raise _ModelUnavailable("still rate limited after several waits")
                 wait = min(_retry_delay(details) or 30, MAX_RATE_LIMIT_SLEEP)
                 log.info("  Gemini per-minute limit reached; waiting %ds...", wait)
-                time.sleep(wait)
+                self.sleep(wait)
                 continue
             if resp.status_code == 404:
                 raise _ModelUnavailable(f"model not found ({message})")
@@ -102,7 +103,7 @@ class GeminiClient:
                     raise GenerationError(f"Gemini server error {resp.status_code}: {message}")
                 wait = 10 * server_errors
                 log.warning("  Gemini %s (%s); retrying in %ds...", resp.status_code, status, wait)
-                time.sleep(wait)
+                self.sleep(wait)
                 continue
             self._raise_fatal(resp)
 
@@ -115,7 +116,7 @@ class GeminiClient:
                 if attempt == self.max_retries:
                     raise GeminiError(f"Network error talking to Gemini: {exc}") from exc
                 log.warning("  Network error (%s), retrying in %ds...", exc, 5 * attempt)
-                time.sleep(5 * attempt)
+                self.sleep(5 * attempt)
         raise GeminiError("Gemini request failed after retries.")
 
     @staticmethod
@@ -123,7 +124,7 @@ class GeminiClient:
         status, message, details = _error_parts(resp)
         reasons = {d.get("reason", "") for d in details}
         if "API_KEY_INVALID" in reasons or "API key not valid" in message:
-            raise GeminiError("Your GEMINI_API_KEY is not valid. Check the value in .env (no quotes or spaces).")
+            raise GeminiError("Your Gemini API key is not valid. Paste it again on the API keys page.")
         if "SERVICE_DISABLED" in reasons or "has not been used in project" in message:
             raise GeminiError(
                 "The Gemini API is not enabled for this key's project. Create the key at "

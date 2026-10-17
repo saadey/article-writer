@@ -21,7 +21,8 @@ a = Analysis(
     pathex=[str(ROOT)],
     datas=datas,
     # Markdown loads its extensions by name at runtime, so list them explicitly.
-    hiddenimports=collect_submodules("markdown.extensions"),
+    hiddenimports=collect_submodules("markdown.extensions")
+    + (["AppKit", "Foundation", "objc", "article_pipeline.macos_menu"] if sys.platform == "darwin" else []),
     excludes=["tkinter", "unittest", "pydoc_data"],
 )
 pyz = PYZ(a.pure)
@@ -44,7 +45,7 @@ if sys.platform == "darwin":
         version=__version__,
         info_plist={
             "CFBundleShortVersionString": __version__,
-            "LSUIElement": True,  # runs in the background; no Dock icon or menu bar
+            "LSUIElement": True,  # menu bar icon only, no Dock icon
             "NSHighResolutionCapable": True,
         },
     )

@@ -81,8 +81,19 @@ def main() -> None:
     print(f"\n  Article Writer is running at {url}\n  {how_to_stop}\n")
     if not args.no_browser:
         threading.Timer(1.0, webbrowser.open, args=(url,)).start()
-    try:
+
+    def serve() -> None:
         app.run(host="127.0.0.1", port=port, threaded=True, debug=False, use_reloader=False)
+
+    try:
+        if FROZEN and sys.platform == "darwin":
+            # The Mac app needs the main thread for its menu bar icon; the server runs alongside.
+            from article_pipeline.macos_menu import run_menu_bar
+
+            threading.Thread(target=serve, daemon=True).start()
+            run_menu_bar(url, on_quit=lambda: PORT_FILE.unlink(missing_ok=True), open_browser=not args.no_browser)
+        else:
+            serve()
     finally:
         PORT_FILE.unlink(missing_ok=True)
 

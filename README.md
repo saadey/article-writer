@@ -40,8 +40,9 @@ transcripts, articles) is stored in a local database. Your API keys stay in a `.
      - **Or Terminal:** `xattr -dr com.apple.quarantine "/Applications/Article Writer.app"`, then double-click it.
 
      (Right-click → Open no longer works for this on macOS 15 and newer.) Repeat after downloading a new version.
-3. The app opens in your browser. There's no window or Dock icon; it runs in the background.
-   Click **Quit** (top right in the app) to stop it. Double-clicking the app again reopens the browser.
+3. The app opens in your browser. It has no window of its own: on Mac it shows a small icon in the menu bar
+   (top right of the screen) with **Open** and **Quit**; on Windows it runs in the background. You can also
+   click **Quit** at the top right of the app. Double-clicking the app again reopens the browser.
 
 Your data is kept separately from the app, so you can replace the app with a newer version anytime:
 

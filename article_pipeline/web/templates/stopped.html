@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Article Writer stopped</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<main class="page">
+  <div class="empty">
+    <h1>Article Writer has stopped</h1>
+    <p>Your work is saved. You can close this tab.</p>
+    <p class="muted">To use it again, {{ 'open the Article Writer app' if frozen else 'run python app.py' }}.</p>
+  </div>
+</main>
+</body>
+</html>

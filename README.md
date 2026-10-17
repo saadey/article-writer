@@ -22,27 +22,58 @@ transcripts, articles) is stored in a local database. Your API keys stay in a `.
 
 ---
 
-## 1. Setup (about 10 minutes)
+## 1. Install
 
-You need **Python 3.9 or newer**. Check with `python3 --version`.
+### Option A: download the app (no Python needed)
+
+1. Open the repository's **Releases** page on GitHub and download the zip for your computer:
+   - **Windows:** `ArticleWriter-windows.zip`
+   - **Mac (Apple Silicon, M1 or newer):** `ArticleWriter-mac.zip`
+2. Unzip it.
+   - **Windows:** open the `ArticleWriter` folder and double-click **ArticleWriter.exe**. The first time,
+     Windows may say "Windows protected your PC": click **More info → Run anyway**.
+   - **Mac:** drag **Article Writer.app** to Applications. The first time, **right-click it → Open → Open**
+     (macOS blocks apps that aren't from the App Store or a paid Apple developer account).
+3. The app opens in your browser. There's no window or Dock icon; it runs in the background.
+   Click **Quit** (top right in the app) to stop it. Double-clicking the app again reopens the browser.
+
+Your data is kept separately from the app, so you can replace the app with a newer version anytime:
+
+| System | Data folder |
+|---|---|
+| Mac | `~/Library/Application Support/Article Writer` |
+| Windows | `%APPDATA%\Article Writer` |
+
+### Option B: run from source (Python 3.9 or newer)
 
 ```bash
 cd "Article Writer"
 python3 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-```
-
-Start the app:
-
-```bash
 python app.py
 ```
 
-It opens in your browser at <http://localhost:8000>. Keep the terminal window open while you use it;
-press Ctrl+C there to stop it. Next time, just activate the environment and run `python app.py` again.
+It opens in your browser at <http://localhost:8000>. Press Ctrl+C in the terminal (or **Quit** in the app)
+to stop it. Running from source keeps your data in the project folder (`data/`, `.env`).
 
-Then open **API keys** in the app and paste your two free keys (see below).
+### Then
+
+Open **API keys** in the app and paste your two free keys (see below).
+
+### Building the apps (for the maintainer)
+
+GitHub builds both apps automatically (`.github/workflows/build-apps.yml`):
+
+- **Test build:** GitHub → **Actions → Build apps → Run workflow**. The zips appear at the bottom of the run page.
+- **Release:** `git tag v1.0.0 && git push --tags`. The zips are attached to a new GitHub Release for your friends
+  to download. Bump the version in `article_pipeline/__init__.py` first.
+
+While the repository is private, friends need to be added as collaborators (Settings → Collaborators) to download
+releases. Each build uses some of GitHub's free Actions minutes; macOS minutes count 10x.
+
+To build locally: `pip install pyinstaller` then `pyinstaller packaging/article_writer.spec`. It builds for the
+computer you run it on.
 
 ## 2. Get a YouTube API key (free)
 
@@ -124,7 +155,9 @@ python main.py import-config my-niche.yaml       # create a project from a confi
 
 ```
 .
-├── app.py                     # start the app: python app.py
+├── app.py                     # start the app: python app.py (also the packaged app's entry point)
+├── packaging/                 # PyInstaller build recipe and smoke test
+├── .github/workflows/         # builds the Windows and Mac apps on GitHub
 ├── main.py                    # command line: python main.py --help
 ├── config.yaml                # starter project, imported on first launch only
 ├── prompts/                   # default prompts for new projects ("Reset to default")
@@ -145,7 +178,10 @@ python main.py import-config my-niche.yaml       # create a project from a confi
 ```
 
 Generated on your computer (never committed): `.env` (keys), `data/app.db` (everything else),
-`logs/`, `exports/`, `.venv/`. **Back up `data/app.db`** to keep your drafts.
+`logs/`, `exports/`, `.venv/`. These live in the project folder when running from source, or in the data
+folder above for the downloaded app. **Back up `app.db`** to keep your drafts. To move your data into the
+downloaded app, quit both, then copy `data/app.db` and `.env` into the app's data folder (`app.db` goes in its
+`data` subfolder).
 
 ## 7. Troubleshooting
 
@@ -161,7 +197,8 @@ Every task's log is on the **Activity** page; full details are also in `logs/pip
 | `All configured Gemini models have hit their free daily limit` | Wait until midnight Pacific time, then **Continue writing**. |
 | `Model '...' was not found` | Google renamed or retired it. Pick a current one from the [models page](https://ai.google.dev/gemini-api/docs/models) in Settings. |
 | `Another task is still running` | One task runs at a time. Wait, or press Stop in the blue bar. |
-| Port 8000 already in use | The app picks the next free port automatically and prints the address. |
+| Port 8000 already in use | The app picks the next free port automatically. |
+| Double-clicking the app does nothing visible | It may already be running: check your browser for an open tab at `localhost:8000`. Logs are in the data folder's `logs/`. |
 
 **Blocked transcript requests.** Transcripts aren't part of the official API, and YouTube blocks IPs that
 look automated, especially **VPNs, cloud servers, and many requests in a short time**. The app stops the

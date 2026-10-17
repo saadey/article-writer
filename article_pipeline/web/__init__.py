@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import os
 import re
 import secrets
+import threading
 from datetime import datetime
 
 import markdown as md
@@ -11,7 +13,7 @@ from flask import (
     Flask, Response, abort, flash, g, jsonify, redirect, render_template, request, session, url_for,
 )
 
-from ..config import DB_PATH, KEY_NAMES, ConfigError, build_settings, default_prompt, load_keys, save_keys
+from ..config import APP_PORT_FILE, DB_PATH, FROZEN, KEY_NAMES, ConfigError, build_settings, default_prompt, load_keys, save_keys
 from ..db import Database, loads
 from ..export import article_markdown, draft_files, zip_drafts
 from ..logging_setup import get_logger
@@ -205,6 +207,18 @@ def create_app() -> Flask:
             return jsonify(ok=True)
         flash("Stopping after the current step.", "ok")
         return redirect(request.referrer or url_for("home"))
+
+    @app.get("/api/ping")
+    def ping():
+        return jsonify(app="article-writer")
+
+    @app.post("/quit")
+    def quit_app():
+        runner.cancel()
+        APP_PORT_FILE.unlink(missing_ok=True)
+        log.info("Quit from the app.")
+        threading.Timer(0.5, os._exit, args=(0,)).start()  # after this page is sent
+        return render_template("stopped.html", frozen=FROZEN)
 
     @app.get("/api/job")
     def job_status():

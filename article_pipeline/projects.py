@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Optional
 
 from .config import (
-    PROJECT_ROOT,
+    RESOURCE_ROOT,
     ConfigError,
     Settings,
     build_settings,
@@ -17,7 +17,7 @@ from .db import Database, loads
 from .logging_setup import get_logger
 
 log = get_logger()
-STARTER_CONFIG = PROJECT_ROOT / "config.yaml"
+STARTER_CONFIG = RESOURCE_ROOT / "config.yaml"
 
 
 def settings_for(project) -> Settings:

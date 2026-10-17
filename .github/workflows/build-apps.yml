@@ -1,0 +1,68 @@
+# Builds the double-click apps for Windows and macOS.
+# - Run it by hand: GitHub -> Actions -> "Build apps" -> Run workflow (downloads appear on the run page).
+# - Or push a version tag (git tag v1.0.0 && git push --tags): the apps are attached to a GitHub Release.
+name: Build apps
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest  # Apple Silicon (M1 and newer)
+            label: mac
+            exe: "dist/Article Writer.app/Contents/MacOS/ArticleWriter"
+          - os: windows-latest
+            label: windows
+            exe: dist/ArticleWriter/ArticleWriter.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt "pyinstaller>=6.10"
+
+      - name: Build
+        run: pyinstaller --noconfirm packaging/article_writer.spec
+
+      - name: Smoke test (start the app, load every page)
+        run: python packaging/smoke_test.py "${{ matrix.exe }}"
+
+      - name: Zip (macOS)
+        if: runner.os == 'macOS'
+        run: ditto -c -k --keepParent "dist/Article Writer.app" ArticleWriter-mac.zip
+
+      - name: Zip (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path dist/ArticleWriter -DestinationPath ArticleWriter-windows.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArticleWriter-${{ matrix.label }}
+          path: ArticleWriter-${{ matrix.label }}.zip
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: ArticleWriter-*.zip
+          generate_release_notes: true

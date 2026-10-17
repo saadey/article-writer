@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import os
 import re
+import sys
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any, Optional
@@ -12,13 +13,35 @@ from typing import Any, Optional
 import yaml
 from dotenv import dotenv_values
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DATA_DIR = PROJECT_ROOT / "data"
+# FROZEN: running as the packaged app (PyInstaller), not from the source folder.
+FROZEN = bool(getattr(sys, "frozen", False))
+# Files that ship with the app: default prompts and the starter config.
+RESOURCE_ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
+
+
+def _data_home() -> Path:
+    """Where your data lives. From source: the project folder (as before).
+    Packaged app: your user folder, so updating the app never touches your drafts."""
+    override = os.environ.get("ARTICLE_WRITER_HOME")
+    if override:
+        return Path(override).expanduser()
+    if not FROZEN:
+        return RESOURCE_ROOT
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "Article Writer"
+    if os.name == "nt":
+        return Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming") / "Article Writer"
+    return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "article-writer"
+
+
+DATA_HOME = _data_home()
+DATA_DIR = DATA_HOME / "data"
 DB_PATH = Path(os.environ.get("ARTICLE_WRITER_DB") or DATA_DIR / "app.db")  # override for testing
-LOG_DIR = PROJECT_ROOT / "logs"
-EXPORTS_DIR = PROJECT_ROOT / "exports"
-ENV_PATH = PROJECT_ROOT / ".env"
-DEFAULT_PROMPTS_DIR = PROJECT_ROOT / "prompts"
+LOG_DIR = DATA_HOME / "logs"
+EXPORTS_DIR = DATA_HOME / "exports"
+ENV_PATH = DATA_HOME / ".env"
+DEFAULT_PROMPTS_DIR = RESOURCE_ROOT / "prompts"
+APP_PORT_FILE = DATA_DIR / "app-port.json"  # lets a second launch find the running app
 
 VALID_ORDERS = {"relevance", "date", "viewCount", "rating"}
 VALID_SAFE_SEARCH = {"none", "moderate", "strict"}
@@ -319,6 +342,7 @@ def save_keys(updates: dict) -> None:
         if name in remaining:
             lines[i] = f"{name}={remaining.pop(name)}"
     lines += [f"{name}={value}" for name, value in remaining.items()]
+    ENV_PATH.parent.mkdir(parents=True, exist_ok=True)
     ENV_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
     try:
         os.chmod(ENV_PATH, 0o600)  # keys readable only by you
@@ -341,7 +365,7 @@ def _build(cls, data: Any, section: str):
 
 def _resolve(value: str) -> Path:
     p = Path(value).expanduser()
-    return p if p.is_absolute() else PROJECT_ROOT / p
+    return p if p.is_absolute() else RESOURCE_ROOT / p
 
 
 def _require_number(name: str, value: Any, minimum: float, maximum: Optional[float] = None) -> None:

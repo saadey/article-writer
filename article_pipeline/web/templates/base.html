@@ -35,6 +35,11 @@
     <nav class="nav nav-right">
       <a href="{{ url_for('projects_page') }}" class="{{ 'active' if request.endpoint == 'projects_page' }}">Projects</a>
       <a href="{{ url_for('keys_page') }}" class="{{ 'active' if request.endpoint == 'keys_page' }}">API keys{% if keys_missing %} <span class="dot" title="Missing keys"></span>{% endif %}</a>
+      <form method="post" action="{{ url_for('quit_app') }}" class="quit-form"
+            data-confirm="{{ 'A task is running. Quitting stops it (unfinished videos stay queued). Quit anyway?' if job and job.status == 'running' else 'Stop Article Writer? Your work is saved; open the app again any time.' }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="nav-btn" title="Stop the app">Quit</button>
+      </form>
     </nav>
   </div>
 </header>

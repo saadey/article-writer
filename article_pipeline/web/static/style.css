@@ -71,6 +71,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--surface-2); 
 .nav a:hover { color: var(--text); background: var(--surface-2); text-decoration: none; }
 .nav a.active { color: var(--text); background: var(--surface-2); font-weight: 600; }
 .nav-right { margin-left: auto; }
+.quit-form { margin: 0; display: flex; }
+.nav-btn { background: none; border: 0; color: var(--muted); padding: .35rem .6rem; border-radius: 7px; cursor: pointer; }
+.nav-btn:hover { color: var(--bad); background: var(--surface-2); }
 .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--bad); vertical-align: middle; }
 
 /* ---- job banner ---- */

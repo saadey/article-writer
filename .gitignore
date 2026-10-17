@@ -18,3 +18,7 @@ logs/
 .claude/
 .vscode/
 .idea/
+
+# Build output
+build/
+dist/

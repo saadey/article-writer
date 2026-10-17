@@ -8,16 +8,21 @@
 # ============================================================
 
 niche:
-  name: "Personal Finance"
+  name: "Psychology, Philosophy and Self Understanding"
 
 # ---- Step 1: YouTube search -----------------------------------
 search:
   # Each keyword is one YouTube search. Each search costs 100 quota
   # units per page of 50 results (free quota: 10,000 units/day).
   keywords:
-    - "how to budget money"
-    - "index fund investing for beginners"
-    - "pay off debt fast"
+    - "psychology of overthinking"
+    - "why we avoid hard conversations"
+    - "emotional regulation explained"
+    - "psychology of identity and self"
+    - "how to think clearly"
+    - "philosophy of the mind"
+    - "why we procrastinate psychology"
+    - "psychology of solitude and loneliness"
 
   # Results to request per keyword (1-200). Above 50 uses extra pages
   # and extra quota.
@@ -72,7 +77,7 @@ writing:
     - gemini-3.5-flash-lite
 
   # Who you write for. Added to the instructions; leave "" to skip.
-  audience: "Beginners in their 20s and 30s who want practical money advice"
+  audience: "Thoughtful adults who want psychology and philosophy explained with depth, and who are tired of generic self help"
   # Leave "" when your instructions file already describes the tone.
   tone: ""
   target_word_count: 1200

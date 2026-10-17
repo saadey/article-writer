@@ -32,8 +32,14 @@ transcripts, articles) is stored in a local database. Your API keys stay in a `.
 2. Unzip it.
    - **Windows:** open the `ArticleWriter` folder and double-click **ArticleWriter.exe**. The first time,
      Windows may say "Windows protected your PC": click **More info → Run anyway**.
-   - **Mac:** drag **Article Writer.app** to Applications. The first time, **right-click it → Open → Open**
-     (macOS blocks apps that aren't from the App Store or a paid Apple developer account).
+   - **Mac:** drag **Article Writer.app** to Applications. macOS blocks the first launch because the app isn't
+     notarized by Apple (that needs a paid developer account). Allow it once, either way:
+     - **System Settings:** double-click the app and click **Done** on the warning. Open **System Settings →
+       Privacy & Security**, scroll down to *"Article Writer" was blocked*, and click **Open Anyway**. Then
+       open the app again → **Open Anyway** → enter your password.
+     - **Or Terminal:** `xattr -dr com.apple.quarantine "/Applications/Article Writer.app"`, then double-click it.
+
+     (Right-click → Open no longer works for this on macOS 15 and newer.) Repeat after downloading a new version.
 3. The app opens in your browser. There's no window or Dock icon; it runs in the background.
    Click **Quit** (top right in the app) to stop it. Double-clicking the app again reopens the browser.
 

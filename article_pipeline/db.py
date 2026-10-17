@@ -1,8 +1,9 @@
 """SQLite tracking of processed videos.
 
 Each video has one row. `stage` is the last pipeline step attempted
-("transcript", then "article"; later steps add more) and `status` is
-the result of that step: pending, done, or failed.
+(transcript -> article -> images -> published) and `status` is the
+result of that step: pending, done, or failed. A video whose images
+stage is done is ready to publish.
 """
 
 from __future__ import annotations
@@ -95,6 +96,9 @@ class Database:
             params.append(limit)
         return self.conn.execute(sql, params).fetchall()
 
+    def all_rows(self) -> list:
+        return self.conn.execute("SELECT * FROM videos ORDER BY updated_at DESC").fetchall()
+
     def counts(self) -> dict:
         rows = self.conn.execute(
             "SELECT stage, status, COUNT(*) AS n FROM videos GROUP BY stage, status"
@@ -159,8 +163,9 @@ class Database:
         )
         self.conn.commit()
 
-    def revert_to(self, video_id: str, stage: str) -> None:
-        """Undo start_stage when a run stops for reasons unrelated to this video (e.g. quota)."""
+    def set_stage_done(self, video_id: str, stage: str) -> None:
+        """Put a video at `stage` = done: used to undo start_stage when a run stops for reasons
+        unrelated to this video (e.g. quota), and to mark/unmark a draft as published."""
         self.conn.execute(
             "UPDATE videos SET stage = ?, status = 'done', error = NULL, updated_at = ? WHERE video_id = ?",
             (stage, _now(), video_id),

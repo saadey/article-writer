@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any, Optional
@@ -107,15 +108,7 @@ class WritingConfig:
             raise ConfigError("Set either writing.instructions_file or writing.instructions, not both.")
 
     def load_instructions(self) -> None:
-        """Read instructions_file (relative to the project folder) into `instructions`."""
-        if not self.instructions_file:
-            return
-        path = _resolve(self.instructions_file)
-        if not path.exists():
-            raise ConfigError(f"writing.instructions_file not found: {path}")
-        self.instructions = path.read_text(encoding="utf-8").strip()
-        if not self.instructions:
-            raise ConfigError(f"writing.instructions_file is empty: {path}")
+        self.instructions = _load_instructions("writing", self.instructions_file, self.instructions)
 
     @property
     def models(self) -> list:
@@ -125,6 +118,26 @@ class WritingConfig:
             if m and m not in seen:
                 seen.append(m)
         return seen
+
+
+@dataclass
+class ImagesConfig:
+    instructions_file: Optional[str] = None
+    instructions: str = ""
+    count: int = 3
+    aspect_ratio: str = "16:9"
+    temperature: float = 1.0
+
+    def validate(self) -> None:
+        _require_int("images.count", self.count, 1, 8)
+        _require_number("images.temperature", self.temperature, 0, 2)
+        if not isinstance(self.aspect_ratio, str) or not re.match(r"^\d+:\d+$", self.aspect_ratio):
+            raise ConfigError('images.aspect_ratio must look like "16:9" (in quotes).')
+        if self.instructions_file and self.instructions.strip():
+            raise ConfigError("Set either images.instructions_file or images.instructions, not both.")
+
+    def load_instructions(self) -> None:
+        self.instructions = _load_instructions("images", self.instructions_file, self.instructions)
 
 
 @dataclass
@@ -142,6 +155,7 @@ class Settings:
     filters: FilterConfig
     transcripts: TranscriptConfig
     writing: WritingConfig
+    images: ImagesConfig
     drafts_dir: Path
     database_path: Path
     log_dir: Path
@@ -181,7 +195,7 @@ def load_settings(config_path: Optional[Path] = None) -> Settings:
     if not isinstance(raw, dict):
         raise ConfigError(f"{path.name} must contain sections like 'search:' and 'filters:'.")
 
-    known_sections = {"niche", "search", "filters", "transcripts", "writing", "output"}
+    known_sections = {"niche", "search", "filters", "transcripts", "writing", "images", "output"}
     unknown = set(raw) - known_sections
     if unknown:
         raise ConfigError(
@@ -195,10 +209,12 @@ def load_settings(config_path: Optional[Path] = None) -> Settings:
     filters = _build(FilterConfig, raw.get("filters"), "filters")
     transcripts = _build(TranscriptConfig, raw.get("transcripts"), "transcripts")
     writing = _build(WritingConfig, raw.get("writing"), "writing")
+    images = _build(ImagesConfig, raw.get("images"), "images")
     output = _build(OutputConfig, raw.get("output"), "output")
-    for section in (search, filters, transcripts, writing):
+    for section in (search, filters, transcripts, writing, images):
         section.validate()
     writing.load_instructions()
+    images.load_instructions()
 
     niche = raw.get("niche") or {}
 
@@ -211,6 +227,7 @@ def load_settings(config_path: Optional[Path] = None) -> Settings:
         filters=filters,
         transcripts=transcripts,
         writing=writing,
+        images=images,
         drafts_dir=_resolve(output.drafts_dir),
         database_path=_resolve(output.database_path),
         log_dir=_resolve(output.log_dir),
@@ -236,6 +253,19 @@ def _build(cls, data: Any, section: str):
         return cls(**data)
     except TypeError as exc:
         raise ConfigError(f"Missing required setting in '{section}': {exc}") from exc
+
+
+def _load_instructions(section: str, file: Optional[str], inline: str) -> str:
+    """Return the instruction text from `file` (relative to the project folder) or the inline text."""
+    if not file:
+        return (inline or "").strip()
+    path = _resolve(file)
+    if not path.exists():
+        raise ConfigError(f"{section}.instructions_file not found: {path}")
+    text = path.read_text(encoding="utf-8").strip()
+    if not text:
+        raise ConfigError(f"{section}.instructions_file is empty: {path}")
+    return text
 
 
 def _resolve(value: str) -> Path:

@@ -93,6 +93,18 @@ writing:
   # Free tier has a small daily request limit; keep runs modest.
   max_articles_per_run: 10
 
+# ---- Step 4: Image prompts (Gemini) ---------------------------
+# Writes image_prompts.md in each draft folder: prompts you paste into an
+# image tool (ChatGPT, Gemini, Midjourney, ...). Uses the writing models.
+images:
+  # Edit this file to change the image style and rules.
+  instructions_file: prompts/image_instructions.md
+  # How many prompts per article. The first is always the header/thumbnail.
+  count: 3
+  # Width:height. 16:9 suits most post headers and social previews.
+  aspect_ratio: "16:9"
+  temperature: 1.0
+
 # ---- Where things are saved ----------------------------------
 # Relative paths are resolved from the project folder.
 output:

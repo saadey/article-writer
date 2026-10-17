@@ -1,15 +1,16 @@
 # YouTube → Article Pipeline
 
-Finds YouTube videos in any niche, pulls their transcripts, and rewrites them into Substack-style article drafts
-with Gemini (free tier). Later steps add image prompts. You publish the drafts by hand.
+Finds YouTube videos in any niche, pulls their transcripts, rewrites them into Substack-style articles
+with Gemini (free tier), writes image prompts for each one, and keeps a list of drafts ready for you
+to publish by hand.
 
 | Step | What it does | Status |
 |------|--------------|--------|
 | 1 | Search YouTube by keywords from `config.yaml` and filter results | ✅ built |
 | 2 | Download transcripts and save a draft folder per video | ✅ built |
 | 3 | Rewrite transcripts into articles with the Gemini free API | ✅ built |
-| 4 | Generate thumbnail image prompts | planned |
-| 5 | Final draft folders for manual publishing | planned |
+| 4 | Write image prompts (header/thumbnail + in-article) | ✅ built |
+| 5 | Draft folders, ready-to-publish list, published tracking | ✅ built |
 
 Your niche lives entirely in `config.yaml`. Your API keys live in `.env`. You don't need to edit any code.
 
@@ -130,6 +131,16 @@ python main.py write --video bNIAi9Sm3rY   # the video ID is at the end of each 
 For a different niche with a different style, create another file (e.g. `prompts/fitness.md`) and set
 `instructions_file: prompts/fitness.md` in that niche's config.
 
+### Changing the image prompts
+
+The image style and rules live in **`prompts/image_instructions.md`** (style, what to avoid, what each
+prompt should contain). In `config.yaml`, the `images:` section sets how many prompts per article
+(`count`; the first is always the header/thumbnail) and the `aspect_ratio`. To redo one article's prompts:
+
+```bash
+python main.py images --video bNIAi9Sm3rY
+```
+
 **Several niches:** copy `config.yaml` to e.g. `config.fitness.yaml`, change its keywords and give it its
 own `output.database_path` and `output.drafts_dir`, then run it with `--config`:
 
@@ -141,10 +152,13 @@ python main.py --config config.fitness.yaml run
 
 ```bash
 python main.py run --dry-run   # search + filter only: shows what would be processed, saves nothing
-python main.py run             # all steps: search, filter, transcripts, articles
+python main.py run             # all steps: search, filter, transcripts, articles, image prompts
 python main.py run --no-write  # stop after transcripts (no Gemini calls)
-python main.py write           # write articles for saved transcripts that don't have one yet
-python main.py write --video ID  # rewrite one article (e.g. after editing the instructions)
+python main.py write           # articles + image prompts for saved transcripts that don't have them yet
+python main.py write --video ID  # rewrite one article and its image prompts (e.g. after editing instructions)
+python main.py images          # only image prompts, for articles that don't have them yet
+python main.py ready           # list drafts that are ready to publish
+python main.py published ID    # mark a draft as published after you post it (--undo to reverse)
 python main.py status          # how many videos are at each step, and the latest errors
 python main.py retry           # try failed (or interrupted) videos again
 python main.py -v run          # same as run, but explains why each video was filtered out
@@ -162,18 +176,27 @@ drafts/
     transcript.json    # raw caption lines with timestamps
     article.md         # the publication ready article: title, subtitle, body, source credit
     editor_notes.md    # for you, not readers: 3 title options, what was removed, claims to fact-check
+    image_prompts.md   # prompts + alt text to paste into an image tool (ChatGPT, Gemini, Midjourney...)
+  INDEX.md             # overview: ready to publish, published, in progress, failed (links to each draft)
 ```
 
 The article's title, title options, word count and the Gemini model used are also added to `metadata.json`.
-A later step will add image prompts to the same folder.
+
+### Publishing workflow
+
+1. Open `drafts/INDEX.md` (or run `python main.py ready`) to see what's ready.
+2. In the draft folder, read `editor_notes.md`: pick a title and fact-check the flagged claims.
+3. Create the images from `image_prompts.md`.
+4. Paste `article.md` into Substack (or your platform), add the images, and publish.
+5. Run `python main.py published <video id>`. It moves to the Published list in `INDEX.md`.
 
 ### How re-runs work
 
 Every video is recorded in a small SQLite database (`data/pipeline.db`) with the step it reached
-(`transcript` or `article`) and a status:
+(`transcript` → `article` → `images` → `published`) and a status:
 
-- **done**: that step succeeded. A video with a transcript but no article yet is picked up by the
-  next `run` or `write`. Videos with a finished article are never processed again.
+- **done**: that step succeeded. Unfinished videos (e.g. a transcript with no article yet) are picked
+  up by the next `run` or `write`. When image prompts are done, the draft is ready to publish.
 - **failed**: something went wrong (no captions, transcript too short, Gemini refused...). Skipped by
   `run` and picked up by `retry`. `python main.py status` shows the reason.
 - **pending**: work started but the run was interrupted (e.g. Ctrl+C). `retry` picks these up.
@@ -187,15 +210,19 @@ So you can run `python main.py run` every day and only new work gets done.
 ├── main.py                    # entry point: python main.py <command>
 ├── config.yaml                # your niche settings
 ├── prompts/
-│   └── article_instructions.md  # how the AI writes articles (edit freely)
+│   ├── article_instructions.md  # how the AI writes articles (edit freely)
+│   └── image_instructions.md    # how the AI writes image prompts (edit freely)
 ├── .env.example               # template for your secrets (copy to .env)
 ├── requirements.txt
 └── article_pipeline/
-    ├── cli.py                 # commands: run, write, retry, status, check
+    ├── cli.py                 # commands: run, write, images, retry, ready, published, status, check
     ├── config.py              # loads + validates config.yaml and .env
     ├── youtube_search.py      # step 1: YouTube Data API search + filters
     ├── transcripts.py         # step 2: transcripts + draft folders
-    ├── articles.py            # step 3: Gemini article writing
+    ├── gemini.py              # Gemini client: rate limits, model fallback, errors
+    ├── articles.py            # step 3: article writing
+    ├── images.py              # step 4: image prompts
+    ├── index.py               # step 5: drafts/INDEX.md
     ├── db.py                  # SQLite status tracking
     └── logging_setup.py       # console + file logging
 ```

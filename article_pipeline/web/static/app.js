@@ -31,7 +31,7 @@
   document.querySelectorAll("[data-copy-text]").forEach((btn) => {
     btn.addEventListener("click", () => copyText(btn.dataset.copyText));
   });
-  // Copies formatted HTML (headings, bold, lists) so it pastes nicely into Substack's editor.
+  // Copies formatted HTML (headings, bold, lists) so it pastes nicely into blog and newsletter editors.
   document.querySelectorAll("[data-copy-html]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const el = document.querySelector(btn.dataset.copyHtml);
@@ -41,7 +41,7 @@
           "text/html": new Blob([el.innerHTML], { type: "text/html" }),
           "text/plain": new Blob([el.innerText], { type: "text/plain" }),
         })]);
-        toast("Article copied. Paste it into the Substack editor.");
+        toast("Article copied. Paste it into your post editor.");
       } catch (e) {
         copyText(el.innerText);
       }

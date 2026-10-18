@@ -5,7 +5,7 @@ WHAT TO CREATE
 - Each further prompt illustrates one key section of the article. Choose the sections whose idea benefits most from a visual.
 
 VISUAL STYLE
-- Editorial illustration suitable for a thoughtful newsletter: clean composition, one clear focal point, generous negative space.
+- Editorial illustration suitable for a thoughtful online publication: clean composition, one clear focal point, generous negative space.
 - Calm, restrained colour palette. Keep the same style across all prompts for one article so the images look like a set.
 - Prefer visual metaphors for abstract ideas (for example, a structure, a path, a balance, a contrast) over literal stock photo scenes.
 

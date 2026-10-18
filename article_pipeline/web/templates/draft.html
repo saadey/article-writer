@@ -23,7 +23,7 @@
 
 <div class="toolbar">
   {% if row.article_body %}
-  <button type="button" class="btn btn-primary" data-copy-html="#article-render">Copy article for Substack</button>
+  <button type="button" class="btn btn-primary" data-copy-html="#article-render">Copy formatted article</button>
   <button type="button" class="btn" data-copy-text="{{ row.article_title }}">Copy title</button>
   {% if row.article_subtitle %}<button type="button" class="btn" data-copy-text="{{ row.article_subtitle }}">Copy subtitle</button>{% endif %}
   {% endif %}

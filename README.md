@@ -16,7 +16,8 @@ transcripts, articles) is stored in a local database. Your API keys stay in a `.
 3. **Write**: only the videos you picked get a transcript, an article (following your instructions, with
    3 title options, editor notes and claims to fact check) and image prompts. One video at a time, so
    each one shows up as ready as soon as it's done.
-4. **Publish**: copy the article into Substack, then mark it as published.
+4. **Publish**: copy the formatted article into your blog or newsletter platform (Medium, Ghost, WordPress,
+   Beehiiv, LinkedIn...), then mark it as published.
 
 (Dislike counts aren't available: YouTube removed them from its public API in 2021.)
 
@@ -114,7 +115,7 @@ Google may use prompts to improve its products, which is fine for public YouTube
 | **Dashboard** | **Find videos** (choose how many), counts, **Continue writing** (videos already started), **Retry failed**, live progress with a Stop button |
 | **Found** | Search results with their stats, sortable (most viewed, most liked, best like ratio, biggest channels, newest...). Tick videos and click **Write selected**, or **Dismiss** them |
 | **Drafts** | Ready to publish / In progress / Published / Failed lists. Download a list as a .zip |
-| **Draft page** | Read and edit the article, **Copy article for Substack** (keeps headings and formatting), pick a title option, check flagged claims, copy image prompts, see the transcript, rewrite, mark as published |
+| **Draft page** | Read and edit the article, **Copy formatted article** (keeps headings, bold and lists when pasted into most editors), pick a title option, check flagged claims, copy image prompts, see the transcript, rewrite, mark as published |
 | **Settings** | Keywords, filters (views, age, length), transcript languages, Gemini model and backups, article length, image prompt count and aspect ratio |
 | **Prompts** | Your instructions to the AI for articles and for image prompts. Edit freely; **Reset to default** restores the files in `prompts/` |
 | **Activity** | Every task with its full log |
@@ -128,7 +129,7 @@ Google may use prompts to improve its products, which is fine for public YouTube
 3. Open **Drafts → Ready to publish** and pick a draft.
 4. On **Titles & notes**, choose a title and fact check the flagged claims.
 5. On **Image prompts**, copy each prompt into your image tool (ChatGPT, Gemini, Midjourney...).
-6. Click **Copy article for Substack**, paste into a new Substack post, add the title, subtitle and images.
+6. Click **Copy formatted article**, paste it into a new post on your platform, and add the title, subtitle and images.
 7. Click **Mark as published**.
 
 Always read and edit before publishing: the AI can get facts wrong, and the ideas come from other creators.

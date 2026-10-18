@@ -26,7 +26,7 @@ ARTICLE_SCHEMA = {
             },
         },
         "title": {"type": "STRING", "description": "The title used for the article (the recommended one)."},
-        "subtitle": {"type": "STRING", "description": "One sentence subtitle for the newsletter post."},
+        "subtitle": {"type": "STRING", "description": "One sentence subtitle shown under the title."},
         "body_markdown": {
             "type": "STRING",
             "description": "The full article body in Markdown, with ## headings. Do not repeat the title.",

@@ -13,7 +13,13 @@ from .db import Database, loads
 from .gemini import GeminiClient, GeminiError, GenerationError
 from .images import generate_image_prompts
 from .logging_setup import get_logger
-from .transcripts import TranscriptBlockedError, TranscriptError, get_transcript, make_transcript_api
+from .transcripts import (
+    TranscriptBlockedError,
+    TranscriptError,
+    gemini_transcript,
+    get_transcript,
+    make_transcript_api,
+)
 from .youtube_search import VideoInfo, YouTubeClient, discover_videos
 
 log = get_logger()
@@ -37,6 +43,8 @@ class Pipeline:
         self.cancel = cancel or threading.Event()
         self.tally: Counter = Counter()
         self._gemini: Optional[GeminiClient] = None
+        self._transcriber: Optional[GeminiClient] = None
+        self._youtube_blocked = False  # once YouTube blocks us, stop asking it during this task
 
     # ---- helpers --------------------------------------------------------------
 
@@ -55,6 +63,15 @@ class Pipeline:
             self._gemini = GeminiClient(self.settings.require_gemini_key(), self.settings.writing.models)
             self._gemini.sleep = self.sleep
         return self._gemini
+
+    @property
+    def transcriber(self) -> GeminiClient:
+        """Gemini client for transcribing videos: the transcript model first, then the writing models."""
+        if self._transcriber is None:
+            models = [self.settings.transcripts.gemini_model] + self.settings.writing.models
+            self._transcriber = GeminiClient(self.settings.require_gemini_key(), list(dict.fromkeys(models)))
+            self._transcriber.sleep = self.sleep
+        return self._transcriber
 
     def summary(self) -> str:
         labels = [
@@ -105,7 +122,7 @@ class Pipeline:
                 api = api or make_transcript_api(self.settings.transcript_proxy_url)
                 video = VideoInfo.from_dict(loads(row["metadata_json"], {}))
                 outcome = self._fetch_one(api, video)
-                if outcome == "blocked":
+                if outcome == "stop":
                     return
                 if outcome != "ok":
                     continue
@@ -129,26 +146,29 @@ class Pipeline:
             if index > 1 and self.settings.transcripts.delay_seconds:
                 self.sleep(self.settings.transcripts.delay_seconds)
             log.info("[%d/%d] %s", index, len(videos), video.title)
-            if self._fetch_one(api, video) == "blocked":
+            if self._fetch_one(api, video) == "stop":
                 return
 
     def _fetch_one(self, api, video: VideoInfo) -> str:
-        """Fetch and save one transcript. Returns 'ok', 'failed', or 'blocked' (stop the run)."""
+        """Fetch and save one transcript. Returns 'ok', 'failed', or 'stop' (end the task)."""
         row_id = self.db.mark_pending(self.project_id, video.to_dict())
         try:
-            text, segments, info = get_transcript(api, video.video_id, self.settings.transcripts)
-        except TranscriptBlockedError as exc:
+            text, segments, info = self._transcribe(api, video)
+        except (TranscriptBlockedError, GeminiError) as exc:
+            # Every other video would fail the same way: record it and stop.
             self.db.mark_failed(row_id, str(exc))
             self.tally["failed"] += 1
             self.tally["stopped"] += 1
             log.error("%s", exc)
             log.error("Stopping early. Remaining videos were not attempted.")
-            return "blocked"
-        except TranscriptError as exc:
+            return "stop"
+        except (TranscriptError, GenerationError) as exc:
             self.db.mark_failed(row_id, str(exc))
             self.tally["failed"] += 1
             log.warning("  transcript failed: %s", exc)
             return "failed"
+        except Cancelled:
+            raise
         except Exception as exc:  # unexpected bug or network error: record it and keep going
             self.db.mark_failed(row_id, f"Unexpected error: {type(exc).__name__}: {exc}")
             self.tally["failed"] += 1
@@ -156,8 +176,28 @@ class Pipeline:
             return "failed"
         self.db.save_transcript(row_id, text, segments, info)
         self.tally["transcripts"] += 1
-        log.info("  saved transcript (%d words)", info["word_count"])
+        log.info("  saved transcript (%d words, %s)", info["word_count"],
+                 "from Gemini" if info.get("source") == "gemini" else "from YouTube captions")
         return "ok"
+
+    def _transcribe(self, api, video: VideoInfo) -> tuple:
+        """YouTube captions first (free, instant); Gemini watches the video when that isn't possible."""
+        cfg = self.settings.transcripts
+        if cfg.source != "gemini" and not self._youtube_blocked:
+            try:
+                return get_transcript(api, video.video_id, cfg)
+            except TranscriptBlockedError:
+                if cfg.source == "youtube" or not self.settings.gemini_api_key:
+                    raise
+                self._youtube_blocked = True
+                log.warning("  YouTube is blocking caption requests from your connection. Using Gemini to "
+                            "transcribe instead (for the rest of this task too).")
+            except TranscriptError as exc:
+                if cfg.source == "youtube" or not self.settings.gemini_api_key or "too short" in str(exc):
+                    raise
+                log.info("  no usable YouTube captions (%s) Transcribing with Gemini instead.", exc)
+        log.info("  transcribing with Gemini from the video link...")
+        return gemini_transcript(self.transcriber, video.video_id, cfg)
 
     # ---- steps 3-4 -------------------------------------------------------------
 

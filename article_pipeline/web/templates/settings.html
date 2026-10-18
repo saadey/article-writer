@@ -21,7 +21,7 @@
           {% if kind == 'lines' %}
             <textarea id="{{ key }}" name="{{ key }}" rows="{{ 5 if key == 'search.keywords' else 3 }}">{{ display_value(v, kind) }}</textarea>
           {% elif kind is not string %}
-            <select id="{{ key }}" name="{{ key }}">{% for c in kind %}<option {{ 'selected' if c == v }}>{{ c }}</option>{% endfor %}</select>
+            <select id="{{ key }}" name="{{ key }}">{% for c in kind %}{% set cv = c if c is string else c[0] %}<option value="{{ cv }}" {{ 'selected' if cv == v }}>{{ c if c is string else c[1] }}</option>{% endfor %}</select>
           {% else %}
             <input id="{{ key }}" name="{{ key }}" value="{{ display_value(v, kind) }}"
                    {% if kind in ('int', 'float') %}inputmode="decimal"{% endif %}>

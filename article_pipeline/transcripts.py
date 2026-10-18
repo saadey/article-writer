@@ -30,7 +30,7 @@ class TranscriptError(Exception):
 
 
 class TranscriptBlockedError(TranscriptError):
-    """YouTube is blocking this IP. Stop the run, since every other video would fail too."""
+    """YouTube is blocking this IP, so every other caption request would fail too."""
 
 
 def make_transcript_api(proxy_url: Optional[str]) -> YouTubeTranscriptApi:
@@ -133,7 +133,45 @@ def get_transcript(api: YouTubeTranscriptApi, video_id: str, cfg: TranscriptConf
         "language": result["language"],
         "is_generated": result["is_generated"],
         "translated": result["translated"],
+        "source": "youtube",
         "word_count": word_count,
         "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
     return text, result["segments"], info
+
+
+GEMINI_TRANSCRIBE_PROMPT = (
+    "Transcribe everything that is said in this video, word for word, in the language it is spoken. "
+    "Write it as plain text paragraphs, starting a new paragraph roughly every minute or when the topic "
+    "changes. No timestamps, speaker labels, headings, descriptions of visuals or commentary. "
+    "Return only the transcript."
+)
+
+
+def gemini_transcript(client, video_id: str, cfg: TranscriptConfig) -> tuple:
+    """Have Gemini watch the public YouTube video and transcribe it. Returns (text, segments, info).
+
+    Google fetches the video, so this works even when YouTube blocks your own IP.
+    Low resolution and few frames keep it to roughly 30-40 tokens per second of video.
+    """
+    parts = [
+        {"fileData": {"fileUri": f"https://www.youtube.com/watch?v={video_id}"}, "videoMetadata": {"fps": 0.1}},
+        {"text": GEMINI_TRANSCRIBE_PROMPT},
+    ]
+    text, model = client.generate_text(parts, {"mediaResolution": "MEDIA_RESOLUTION_LOW", "temperature": 0})
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    word_count = len(text.split())
+    if word_count < cfg.min_words:
+        raise TranscriptError(
+            f"Transcript too short ({word_count} words; the minimum is {cfg.min_words})."
+        )
+    info = {
+        "language_code": "",
+        "language": f"Transcribed by {model}",
+        "source": "gemini",
+        "is_generated": True,
+        "translated": False,
+        "word_count": word_count,
+        "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    }
+    return text, [], info

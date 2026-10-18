@@ -45,10 +45,33 @@ class GeminiClient:
 
     def generate_json(self, system: str, prompt: str, schema: dict, temperature: float) -> tuple:
         """Return (parsed_json, model_used), falling back through models on quota/availability."""
+        body = {
+            "systemInstruction": {"parts": [{"text": system}]},
+            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": temperature,
+                "responseMimeType": "application/json",
+                "responseSchema": schema,
+            },
+        }
+        data, model = self._with_fallback(body)
+        text = _response_text(data)
+        try:
+            return json.loads(text), model
+        except ValueError as exc:
+            raise GenerationError(f"Gemini returned invalid JSON: {exc}") from exc
+
+    def generate_text(self, parts: list, generation_config: dict) -> tuple:
+        """Send parts (text, YouTube links...) and return (text, model_used)."""
+        body = {"contents": [{"role": "user", "parts": parts}], "generationConfig": generation_config}
+        data, model = self._with_fallback(body)
+        return _response_text(data), model
+
+    def _with_fallback(self, body: dict) -> tuple:
         while self.models:
             model = self.models[0]
             try:
-                return self._generate(model, system, prompt, schema, temperature), model
+                return self._generate(model, body), model
             except _ModelUnavailable as exc:
                 log.warning("Model %s unavailable: %s", model, exc)
                 self.models.pop(0)
@@ -63,26 +86,17 @@ class GeminiClient:
         """Cheap request that confirms the key works and the model exists."""
         resp = self._request("GET", f"{API_BASE}/models/{model}")
         if resp.status_code == 404:
-            raise GeminiError(f"Model '{model}' was not found. Check writing.model in config.yaml.")
+            raise GeminiError(f"Model '{model}' was not found. Pick a current model in Settings.")
         if resp.status_code != 200:
             self._raise_fatal(resp)
 
-    def _generate(self, model: str, system: str, prompt: str, schema: dict, temperature: float) -> dict:
-        body = {
-            "systemInstruction": {"parts": [{"text": system}]},
-            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "temperature": temperature,
-                "responseMimeType": "application/json",
-                "responseSchema": schema,
-            },
-        }
+    def _generate(self, model: str, body: dict) -> dict:
         url = f"{API_BASE}/models/{model}:generateContent"
         rate_limit_waits = server_errors = 0
         while True:
             resp = self._request("POST", url, json=body)
             if resp.status_code == 200:
-                return _parse_response(resp.json())
+                return resp.json()
 
             status, message, details = _error_parts(resp)
             if resp.status_code == 429:
@@ -163,7 +177,7 @@ def _retry_delay(details: list) -> Optional[int]:
     return None
 
 
-def _parse_response(data: dict) -> dict:
+def _response_text(data: dict) -> str:
     block = (data.get("promptFeedback") or {}).get("blockReason")
     if block:
         raise GenerationError(f"Gemini blocked the request ({block}).")
@@ -179,7 +193,4 @@ def _parse_response(data: dict) -> dict:
         raise GenerationError("Gemini's answer was cut off (too long). Try a lower writing.target_word_count.")
     if finish not in ("STOP", "FINISH_REASON_UNSPECIFIED") and not text:
         raise GenerationError(f"Gemini stopped without an answer (reason: {finish}).")
-    try:
-        return json.loads(text)
-    except ValueError as exc:
-        raise GenerationError(f"Gemini returned invalid JSON: {exc}") from exc
+    return text

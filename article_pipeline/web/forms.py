@@ -5,6 +5,7 @@ from __future__ import annotations
 from ..config import ConfigError
 
 # (key, label, type, help). type: lines | int | float | text | text_opt | bool | (choices...)
+# Choices are values, or (value, label) pairs.
 SETTINGS_FORM = [
     ("Search", "What to look for on YouTube.", [
         ("search.keywords", "Keywords", "lines",
@@ -26,6 +27,14 @@ SETTINGS_FORM = [
          "Prefills the 'How many' box. The most viewed matches are kept."),
     ]),
     ("Transcripts", "", [
+        ("transcripts.source", "Transcript source", (
+            ("auto", "Auto: YouTube captions, Gemini if blocked or missing"),
+            ("youtube", "YouTube captions only"),
+            ("gemini", "Gemini only (transcribes from the video link)"),
+        ), "Gemini works even when YouTube blocks your connection. It uses Gemini free quota "
+           "(up to 8 hours of video per day)."),
+        ("transcripts.gemini_model", "Gemini model for transcribing", "text",
+         "A fast model is enough. Your writing models are used as backups."),
         ("transcripts.languages", "Languages", "lines", "Preferred transcript languages in order, like en."),
         ("transcripts.allow_auto_generated", "Allow auto generated captions", "bool",
          "Most videos only have these."),

@@ -199,7 +199,7 @@ Every task's log is on the **Activity** page; full details are also in `logs/pip
 | `YouTube API key is not set / not valid` | Paste it again on the API keys page. |
 | `YouTube Data API v3 is not enabled` | Step 3 of "Get a YouTube API key". Wait a minute after enabling. |
 | `daily quota is used up` | Wait until midnight Pacific time, or use fewer keywords/results. |
-| `YouTube is blocking transcript requests from your IP` | See below. |
+| `YouTube is blocking transcript requests from your IP` | With **Transcript source: Auto** (the default) Gemini transcribes instead, so you won't see this. See below. |
 | `Captions are disabled` / `No transcript in languages` | Normal for some videos; they're marked failed. |
 | `All configured Gemini models have hit their free daily limit` | Wait until midnight Pacific time, then **Continue writing**. |
 | `Model '...' was not found` | Google renamed or retired it. Pick a current one from the [models page](https://ai.google.dev/gemini-api/docs/models) in Settings. |
@@ -207,10 +207,12 @@ Every task's log is on the **Activity** page; full details are also in `logs/pip
 | Port 8000 already in use | The app picks the next free port automatically. |
 | Double-clicking the app does nothing visible | It may already be running: check your browser for an open tab at `localhost:8000`. Logs are in the data folder's `logs/`. |
 
-**Blocked transcript requests.** Transcripts aren't part of the official API, and YouTube blocks IPs that
-look automated, especially **VPNs, cloud servers, and many requests in a short time**. The app stops the
-task when this happens instead of marking every video failed. Turn off any VPN, wait a few hours, then use
-**Retry failed**. Raising "Pause between videos" in Settings helps. If it keeps happening, add a rotating
-residential proxy on the API keys page.
+**Blocked transcript requests.** YouTube captions aren't part of the official API, and YouTube blocks
+connections that look automated, especially **VPNs, cloud servers, and many requests in a short time**.
+That's why the default **Transcript source** (Settings → Transcripts) is **Auto**: it tries YouTube's
+captions first and, if YouTube blocks you or a video has no captions, Gemini watches the public video from
+its link and transcribes it (about 15 seconds per video, using Gemini free quota of up to 8 hours of video
+per day). Choose **Gemini only** to skip YouTube entirely, or **YouTube captions only** to never use Gemini
+for transcripts (then a block stops the task; wait a few hours, or add a residential proxy on the API keys page).
 
 **"NotOpenSSLWarning" on macOS:** harmless and already silenced.

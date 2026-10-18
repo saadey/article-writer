@@ -45,6 +45,7 @@ APP_PORT_FILE = DATA_DIR / "app-port.json"  # lets a second launch find the runn
 
 VALID_ORDERS = {"relevance", "date", "viewCount", "rating"}
 VALID_SAFE_SEARCH = {"none", "moderate", "strict"}
+TRANSCRIPT_SOURCES = {"auto", "youtube", "gemini"}
 KEY_NAMES = ("YOUTUBE_API_KEY", "GEMINI_API_KEY", "TRANSCRIPT_PROXY_URL")
 
 
@@ -98,6 +99,10 @@ class FilterConfig:
 
 @dataclass
 class TranscriptConfig:
+    # auto: YouTube captions first; Gemini transcribes from the video link if YouTube blocks
+    # you or the video has no captions. youtube / gemini: only that source.
+    source: str = "auto"
+    gemini_model: str = "gemini-3.5-flash-lite"
     languages: list = field(default_factory=lambda: ["en"])
     allow_auto_generated: bool = True
     translate_if_missing: bool = False
@@ -107,6 +112,10 @@ class TranscriptConfig:
     def validate(self) -> None:
         if not isinstance(self.languages, list) or not self.languages:
             raise ConfigError('Add at least one transcript language, e.g. "en".')
+        if self.source not in TRANSCRIPT_SOURCES:
+            raise ConfigError(f"Transcript source must be one of {sorted(TRANSCRIPT_SOURCES)}.")
+        if not isinstance(self.gemini_model, str) or not self.gemini_model.strip():
+            raise ConfigError("Choose a Gemini model for transcribing, e.g. gemini-3.5-flash-lite.")
         _require_int("Minimum transcript words", self.min_words, 0)
         _require_number("Transcript delay", self.delay_seconds, 0)
 
@@ -216,6 +225,8 @@ DEFAULT_SETTINGS = {
         "max_videos_per_run": 10,
     },
     "transcripts": {
+        "source": "auto",
+        "gemini_model": "gemini-3.5-flash-lite",
         "languages": ["en"],
         "allow_auto_generated": True,
         "translate_if_missing": False,

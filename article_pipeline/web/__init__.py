@@ -13,7 +13,10 @@ from flask import (
     Flask, Response, abort, flash, g, jsonify, redirect, render_template, request, session, url_for,
 )
 
-from ..config import APP_PORT_FILE, DB_PATH, FROZEN, KEY_NAMES, ConfigError, build_settings, default_prompt, load_keys, save_keys
+from ..config import (
+    APP_PORT_FILE, DB_PATH, FROZEN, KEY_NAMES, ConfigError, build_settings, default_prompt, load_keys, save_keys,
+    settings_to_dict,
+)
 from ..db import Database, loads
 from ..export import article_markdown, draft_files, zip_drafts
 from ..logging_setup import get_logger
@@ -407,7 +410,11 @@ def create_app() -> Flask:
     @app.route("/p/<int:pid>/settings", methods=["GET", "POST"])
     def settings_page(pid):
         load_project(pid)
-        values = loads(g.project["settings_json"], {})
+        try:  # fill in defaults for settings added in newer versions
+            values = settings_to_dict(build_settings(loads(g.project["settings_json"], {}), g.project["name"],
+                                                     with_keys=False))
+        except ConfigError:
+            values = loads(g.project["settings_json"], {})
         if request.method == "POST":
             try:
                 values = parse_settings_form(request.form)

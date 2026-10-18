@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token }}">
-  <title>{% block title %}Article Writer{% endblock %}</title>
+  <title>{% block title %}{% endblock %}{% if self.title() %} · {% endif %}Article Writer v{{ app_version }}</title>
   <link rel="icon" href="{{ url_for('static', filename='logo.svg') }}" type="image/svg+xml">
   <link rel="icon" href="{{ url_for('static', filename='favicon-32.png') }}" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
@@ -14,37 +14,52 @@
 <body {% if project %}data-found-url="{{ url_for('found', pid=project.id) }}"{% endif %}>
 <header class="topbar">
   <div class="topbar-inner">
-    <a class="brand" href="{{ url_for('home') }}"><img src="{{ url_for('static', filename='logo.svg') }}" alt="" width="24" height="24"> Article Writer</a>
+    <a class="brand" href="{{ url_for('home') }}" title="Article Writer v{{ app_version }}">
+      <img src="{{ url_for('static', filename='logo.svg') }}" alt="" width="26" height="26">
+      <span>Article Writer <span class="brand-version">v{{ app_version }}</span></span>
+    </a>
     {% if project %}
-    <label class="project-switch">
+    <label class="project-switch" title="Switch project (one per niche)">
       <span class="sr-only">Project</span>
       <select data-project-switch>
         {% for p in projects %}
         <option value="{{ url_for('dashboard', pid=p.id) }}" {% if p.id == project.id %}selected{% endif %}>{{ p.name }}</option>
         {% endfor %}
-        <option value="{{ url_for('projects_page') }}">Manage projects…</option>
+        <option value="{{ url_for('projects_page') }}">+ New or manage projects…</option>
       </select>
     </label>
-    <nav class="nav">
-      {% set ep = request.endpoint %}
+    {% set ep = request.endpoint %}
+    <nav class="nav nav-main" aria-label="Workflow">
       <a href="{{ url_for('dashboard', pid=project.id) }}" class="{{ 'active' if ep == 'dashboard' }}">Dashboard</a>
-      <a href="{{ url_for('found', pid=project.id) }}" class="{{ 'active' if ep == 'found' }}">Found</a>
-      <a href="{{ url_for('drafts', pid=project.id) }}" class="{{ 'active' if ep in ('drafts', 'draft') }}">Drafts</a>
-      <a href="{{ url_for('settings_page', pid=project.id) }}" class="{{ 'active' if ep == 'settings_page' }}">Settings</a>
-      <a href="{{ url_for('prompts_page', pid=project.id) }}" class="{{ 'active' if ep == 'prompts_page' }}">Prompts</a>
-      <a href="{{ url_for('activity', pid=project.id) }}" class="{{ 'active' if ep in ('activity', 'activity_log') }}">Activity</a>
+      <a href="{{ url_for('found', pid=project.id) }}" class="{{ 'active' if ep == 'found' }}">Find &amp; pick{% if nav_counts.found %} <span class="count">{{ nav_counts.found }}</span>{% endif %}</a>
+      <a href="{{ url_for('drafts', pid=project.id) }}" class="{{ 'active' if ep in ('drafts', 'draft') }}">Drafts{% if nav_counts.ready %} <span class="count count-ready" title="Ready to publish">{{ nav_counts.ready }}</span>{% endif %}</a>
     </nav>
     {% endif %}
-    <nav class="nav nav-right">
-      <a href="{{ url_for('projects_page') }}" class="{{ 'active' if request.endpoint == 'projects_page' }}">Projects</a>
-      <a href="{{ url_for('about') }}" class="{{ 'active' if request.endpoint in ('about', 'licenses') }}">About</a>
-      <a href="{{ url_for('keys_page') }}" class="{{ 'active' if request.endpoint == 'keys_page' }}">API keys{% if keys_missing %} <span class="dot" title="Missing keys"></span>{% endif %}</a>
-      <form method="post" action="{{ url_for('quit_app') }}" class="quit-form"
-            data-confirm="{{ 'A task is running. Quitting stops it (unfinished videos stay queued). Quit anyway?' if job and job.status == 'running' else 'Stop Article Writer? Your work is saved; open the app again any time.' }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <button class="nav-btn" title="Stop the app">Quit</button>
-      </form>
-    </nav>
+    <details class="menu main-menu">
+      <summary class="btn btn-small">Menu{% if keys_missing %} <span class="dot" title="API keys missing"></span>{% endif %}</summary>
+      <div class="menu-body">
+        {% if project %}
+        <span class="menu-label">{{ project.name }}</span>
+        <a href="{{ url_for('settings_page', pid=project.id) }}">Settings <span class="menu-hint">keywords, filters, models</span></a>
+        <a href="{{ url_for('prompts_page', pid=project.id) }}">Prompts <span class="menu-hint">how articles are written</span></a>
+        <a href="{{ url_for('activity', pid=project.id) }}">Activity <span class="menu-hint">task history and logs</span></a>
+        <hr>
+        {% endif %}
+        <span class="menu-label">App</span>
+        <a href="{{ url_for('projects_page') }}">Projects</a>
+        <a href="{{ url_for('keys_page') }}">API keys{% if keys_missing %} <span class="badge badge-failed">needed</span>{% endif %}</a>
+        <a href="{{ url_for('help_page') }}">Help &amp; getting started</a>
+        <a href="{{ url_for('about') }}">About &amp; credits</a>
+        <a href="{{ url_for('terms') }}">Terms of use</a>
+        <a href="{{ author_url }}" target="_blank" rel="noopener">{{ author }} on GitHub ↗</a>
+        <hr>
+        <form method="post" action="{{ url_for('quit_app') }}"
+              data-confirm="{{ 'A task is running. Quitting stops it (unfinished videos stay queued). Quit anyway?' if job and job.status == 'running' else 'Stop Article Writer? Your work is saved; open the app again any time.' }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="danger">Quit Article Writer</button>
+        </form>
+      </div>
+    </details>
   </div>
 </header>
 
@@ -77,7 +92,9 @@
   <span>© {{ copyright_year }} <a href="{{ author_url }}" target="_blank" rel="noopener">{{ author }}</a></span>
   <span><a href="{{ url_for('licenses') }}">MIT License</a></span>
   <span><a href="{{ url_for('about') }}">About &amp; credits</a></span>
-  <span><a href="{{ repo_url }}" target="_blank" rel="noopener">GitHub</a></span>
+  <span><a href="{{ url_for('terms') }}">Terms of use</a></span>
+  <span><a href="{{ url_for('help_page') }}">Help</a></span>
+  <span><a href="{{ author_url }}" target="_blank" rel="noopener">github.com/saadey</a></span>
 </footer>
 </body>
 </html>

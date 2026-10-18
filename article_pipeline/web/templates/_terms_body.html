@@ -1,0 +1,54 @@
+<div class="prose-sm terms">
+  <p class="muted small">Version {{ terms_version }} · Applies to Article Writer v{{ app_version }}</p>
+
+  <h3>1. What Article Writer is</h3>
+  <p>Article Writer is free, open-source software by {{ author }}, released under the
+    <a href="{{ url_for('licenses') }}">MIT License</a>. It runs on your own computer and helps you research YouTube
+    videos and draft articles with AI. It does not publish anything for you.</p>
+
+  <h3>2. No warranty</h3>
+  <p>The software is provided <strong>"as is", without warranty of any kind</strong>. The author is not liable for any
+    claim, damages or other liability arising from its use, as set out in the MIT License. Use it at your own risk.</p>
+
+  <h3>3. Your responsibilities</h3>
+  <ul>
+    <li><strong>What you publish is your responsibility.</strong> Drafts are based on other creators' work. Edit them,
+      add your own perspective, and make sure what you publish does not infringe anyone's copyright or other rights.
+      Copyright and fair use rules differ by country; when in doubt, get permission or legal advice.</li>
+    <li><strong>Check facts.</strong> AI output can be wrong or misleading. Review every draft, especially the
+      "claims to check", and never present it as professional (medical, legal, financial) advice.</li>
+    <li><strong>Be honest with readers.</strong> Don't present AI-assisted writing deceptively, and follow your
+      publishing platform's rules on AI content and disclosure.</li>
+    <li><strong>Use your own API keys</strong> and keep them private. You're responsible for usage on your keys.</li>
+  </ul>
+
+  <h3>4. Third-party services</h3>
+  <p>Article Writer uses services you connect with your own keys. Their terms apply to that use, and you must meet
+    their requirements (including age and regional requirements):</p>
+  <ul>
+    <li><strong>YouTube.</strong> Article Writer uses YouTube API Services. By using Article Writer, you agree to be
+      bound by the <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener">YouTube Terms of Service</a>
+      and the <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google Privacy Policy</a>.</li>
+    <li><strong>Google Gemini API.</strong> Covered by the
+      <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener">Gemini API Additional Terms of Service</a>
+      and Google's terms. On the free tier, Google may use your requests to improve its products.</li>
+  </ul>
+  <p>Reading YouTube captions directly (the optional "YouTube captions" transcript source) is an unofficial method
+    that YouTube's terms do not permit. It is off by default; if you turn it on, you do so at your own risk.</p>
+  <p>YouTube and Gemini are trademarks of Google LLC. Article Writer is independent and is not affiliated with,
+    endorsed by, or sponsored by Google or YouTube. Other names belong to their owners.</p>
+
+  <h3>5. Privacy</h3>
+  <p>Article Writer has no accounts, analytics or tracking, and the author receives no data from you. Your projects,
+    drafts and keys are stored only on your computer. The app sends requests only to the services above, using your
+    keys. To follow YouTube's API policies, search results you haven't acted on are removed after 30 days, and video
+    statistics (views, likes, comments, subscribers) are erased after 30 days.</p>
+
+  <h3>6. Open-source components</h3>
+  <p>Article Writer includes open-source software used under its own licenses; see
+    <a href="{{ url_for('about') }}">About &amp; credits</a> and <a href="{{ url_for('licenses') }}">Licenses</a>.</p>
+
+  <h3>7. Changes</h3>
+  <p>These terms may change in future versions. If they do, the app will show them again before you continue.
+    Questions or problems: <a href="{{ repo_url }}/issues" target="_blank" rel="noopener">open an issue on GitHub</a>.</p>
+</div>

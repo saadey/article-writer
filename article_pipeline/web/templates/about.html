@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}About · Article Writer{% endblock %}
+{% block title %}About{% endblock %}
 {% block content %}
 <div class="about-hero">
   <img src="{{ url_for('static', filename='logo.svg') }}" alt="Article Writer logo" width="88" height="88">
@@ -30,11 +30,13 @@
     <p>The app only connects to:</p>
     <ul>
       <li><strong>YouTube Data API</strong> to search for videos (with your key)</li>
-      <li><strong>YouTube</strong> to read a video's captions, and <strong>i.ytimg.com</strong> for thumbnails</li>
       <li><strong>Google Gemini API</strong> to transcribe videos and write articles (with your key)</li>
+      <li><strong>i.ytimg.com</strong> for video thumbnails, and <strong>YouTube</strong> captions only if you turn that
+        option on</li>
     </ul>
     <p class="muted small">Those requests follow Google's terms and privacy policies. On Gemini's free tier, Google may
-      use requests to improve its products.</p>
+      use requests to improve its products. Search results you don't act on are removed after 30 days, and video
+      statistics are erased after 30 days, as YouTube's API policies require. See the <a href="{{ url_for('terms') }}">terms of use</a>.</p>
   </section>
 
   <section class="card prose-sm">

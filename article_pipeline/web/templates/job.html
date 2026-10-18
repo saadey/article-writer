@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Task log · Article Writer{% endblock %}
+{% block title %}Task log{% endblock %}
 {% block content %}
 <p class="crumbs"><a href="{{ url_for('activity', pid=project.id) }}">Activity</a> /</p>
 <div class="page-head"><div><h1>{{ job_labels.get(j.kind, j.kind) }}</h1>

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ row.article_title or row.title }} · Article Writer{% endblock %}
+{% block title %}{{ row.article_title or row.title }}{% endblock %}
 {% block content %}
 {% set b = badge(row) %}
 <p class="crumbs"><a href="{{ url_for('drafts', pid=project.id) }}">Drafts</a> /</p>

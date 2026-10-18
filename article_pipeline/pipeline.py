@@ -95,6 +95,7 @@ class Pipeline:
 
     def find(self, limit: Optional[int] = None) -> list:
         """Search only: save new videos with their stats for you to review. No transcripts, no Gemini."""
+        self.db.expire_api_data()
         videos = self.discover(limit)
         for video in videos:
             self.db.save_found(self.project_id, video.to_dict())

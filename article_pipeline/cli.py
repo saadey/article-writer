@@ -18,6 +18,8 @@ from .youtube_search import YouTubeAPIError
 log = get_logger()
 
 STAGE_LABELS = {
+    ("found", "done"): "found, waiting for you to pick",
+    ("dismissed", "done"): "dismissed",
     ("transcript", "done"): "transcript saved, waiting for article",
     ("transcript", "failed"): "transcript failed",
     ("transcript", "pending"): "transcript interrupted",
@@ -234,9 +236,10 @@ def cmd_status(db: Database, pid: int) -> int:
     if not counts:
         print("No videos yet. Run: python main.py run")
         return 0
-    order = ["transcript", "article", "images", "published"]
+    order = ["found", "transcript", "article", "images", "published", "dismissed"]
     print("Videos:")
-    for (stage, status), n in sorted(counts.items(), key=lambda kv: (order.index(kv[0][0]), kv[0][1])):
+    rank = lambda stage: order.index(stage) if stage in order else len(order)  # noqa: E731
+    for (stage, status), n in sorted(counts.items(), key=lambda kv: (rank(kv[0][0]), kv[0][1])):
         print(f"  {n:>4}  {STAGE_LABELS.get((stage, status), f'{stage} {status}')}")
     failures = db.recent_failures(pid)
     if failures:

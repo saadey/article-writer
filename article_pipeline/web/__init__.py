@@ -28,6 +28,10 @@ from .jobs import JOB_LABELS, runner
 log = get_logger()
 
 ALLOWED_HOSTS = {"127.0.0.1", "localhost", "[::1]"}
+TERMS_VERSION = "1"  # bump when the terms change, so people see them again
+# Pages that work before the terms are accepted.
+OPEN_ENDPOINTS = {"welcome", "accept_terms", "terms", "about", "licenses", "static", "ping", "quit_app"}
+STARTER_KEYWORDS = {"how to learn faster", "how to build better habits", "how to focus deeply"}
 VIEWS = [("ready", "Ready to publish"), ("progress", "In progress"), ("published", "Published"),
          ("failed", "Failed"), ("all", "All")]
 FOUND_SORTS = [("views", "Most viewed"), ("likes", "Most liked"), ("ratio", "Best like ratio"),
@@ -56,6 +60,10 @@ def create_app() -> Flask:
     with Database(DB_PATH) as db:
         db.mark_orphaned_jobs()
         ensure_a_project(db)
+        removed, cleared = db.expire_api_data()
+        if removed or cleared:
+            log.info("Data retention: removed %d old search result(s), cleared stats on %d video(s).",
+                     removed, cleared)
 
     # ---- request plumbing ---------------------------------------------------
 
@@ -71,6 +79,9 @@ def create_app() -> Flask:
             if not sent or not secrets.compare_digest(sent, csrf_token):
                 abort(400, "Security token missing or out of date. Reload the page and try again.")
         g.db = Database(DB_PATH)
+        # First launch (or new terms): show the welcome notice before anything else.
+        if request.endpoint not in OPEN_ENDPOINTS and g.db.meta("terms_accepted") != TERMS_VERSION:
+            return redirect(url_for("welcome", next=request.full_path if request.method == "GET" else None))
 
     @app.teardown_request
     def close_db(_exc):
@@ -84,9 +95,12 @@ def create_app() -> Flask:
     @app.context_processor
     def template_globals():
         project = getattr(g, "project", None)
+        nav_counts = g.db.summary_counts(project["id"]) if project is not None and "db" in g else {}
         return {
+            "nav_counts": nav_counts,
             "csrf_token": csrf_token,
             "app_version": __version__,
+            "terms_version": TERMS_VERSION,
             "author": AUTHOR,
             "author_url": AUTHOR_URL,
             "repo_url": REPO_URL,
@@ -138,9 +152,25 @@ def create_app() -> Flask:
         settings = loads(g.project["settings_json"], {})
         keywords = (settings.get("search") or {}).get("keywords") or []
         per_keyword = (settings.get("search") or {}).get("max_results_per_keyword", 25)
+        counts = g.db.summary_counts(pid)
+        keys = load_keys()
+        drafted = counts["ready"] + counts["published"]
+        steps = [
+            ("Add your free API keys", bool(keys.get("YOUTUBE_API_KEY") and keys.get("GEMINI_API_KEY")),
+             url_for("keys_page"), "YouTube for searching, Gemini for writing. Takes about 5 minutes."),
+            ("Choose your niche's keywords", bool(keywords) and not set(keywords) <= STARTER_KEYWORDS,
+             url_for("settings_page", pid=pid), "What should the app search YouTube for?"),
+            ("Find videos", counts["found"] + counts["dismissed"] + counts["progress"] + drafted
+             + counts["failed"] > 0, "#count", "Pick how many and click Find videos below."),
+            ("Write your first article", drafted > 0, url_for("found", pid=pid),
+             "Tick the best videos on Find & pick, then Write selected."),
+            ("Publish it", counts["published"] > 0, url_for("drafts", pid=pid, view="ready"),
+             "Copy the article into your blog, then click Mark as published."),
+        ]
         return render_template(
             "dashboard.html",
-            counts=g.db.summary_counts(pid),
+            steps=steps,
+            counts=counts,
             failures=g.db.recent_failures(pid, 5),
             jobs=g.db.jobs(pid, 8),
             keywords=keywords,
@@ -216,6 +246,28 @@ def create_app() -> Flask:
             return jsonify(ok=True)
         flash("Stopping after the current step.", "ok")
         return redirect(request.referrer or url_for("home"))
+
+    @app.get("/welcome")
+    def welcome():
+        return render_template("welcome.html", next_url=request.args.get("next") or url_for("home"))
+
+    @app.post("/welcome")
+    def accept_terms():
+        g.db.set_meta("terms_accepted", TERMS_VERSION)
+        next_url = request.form.get("next") or ""
+        return redirect(next_url if next_url.startswith("/") and not next_url.startswith("//") else url_for("home"))
+
+    @app.get("/terms")
+    def terms():
+        if session.get("project_id"):
+            g.project = g.db.project(session["project_id"])
+        return render_template("terms.html")
+
+    @app.get("/help")
+    def help_page():
+        if session.get("project_id"):
+            g.project = g.db.project(session["project_id"])
+        return render_template("help.html")
 
     @app.get("/about")
     def about():
@@ -477,8 +529,9 @@ def create_app() -> Flask:
                     updates[name] = value  # empty fields keep the saved key
             save_keys(updates)
             flash("Keys saved to .env on this computer.", "ok")
-            if request.form.get("check") and g.project:
-                return start_job(g.project["id"], "check", lambda p: p.check_keys(), url_for("keys_page"))
+            project = getattr(g, "project", None) or (g.db.projects() or [None])[0]
+            if request.form.get("check") and project:
+                return start_job(project["id"], "check", lambda p: p.check_keys(), url_for("keys_page"))
             return redirect(url_for("keys_page"))
         keys = load_keys()
         return render_template("keys.html", saved={k: _mask(v) for k, v in keys.items()})
@@ -488,6 +541,13 @@ def create_app() -> Flask:
     @app.errorhandler(404)
     def http_error(err):
         return render_template("error.html", err=err), err.code
+
+    @app.errorhandler(500)
+    def server_error(err):
+        log.error("Unexpected error on %s", request.path, exc_info=getattr(err, "original_exception", None))
+        err.description = ("Something went wrong on this page. It has been written to the log; try again, and if "
+                           "it keeps happening, report it on GitHub (Menu → Help).")
+        return render_template("error.html", err=err), 500
 
     return app
 

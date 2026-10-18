@@ -28,11 +28,12 @@ SETTINGS_FORM = [
     ]),
     ("Transcripts", "", [
         ("transcripts.source", "Transcript source", (
-            ("auto", "Auto: YouTube captions, Gemini if blocked or missing"),
+            ("gemini", "Gemini reads the video (recommended)"),
+            ("auto", "YouTube captions first, then Gemini"),
             ("youtube", "YouTube captions only"),
-            ("gemini", "Gemini only (transcribes from the video link)"),
-        ), "Gemini works even when YouTube blocks your connection. It uses Gemini free quota "
-           "(up to 8 hours of video per day)."),
+        ), "Gemini uses Google's official API and works even if YouTube blocks your connection (free: up to "
+           "8 hours of video a day). Reading captions directly is unofficial and not permitted by YouTube's "
+           "Terms of Service; use it at your own risk."),
         ("transcripts.gemini_model", "Gemini model for transcribing", "text",
          "A fast model is enough. Your writing models are used as backups."),
         ("transcripts.languages", "Languages", "lines", "Preferred transcript languages in order, like en."),

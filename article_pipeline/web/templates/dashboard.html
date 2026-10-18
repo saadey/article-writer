@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ project.name }} · Article Writer{% endblock %}
+{% block title %}{{ project.name }}{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
@@ -11,6 +11,26 @@
     </p>
   </div>
 </div>
+
+{% set done = steps|selectattr(1)|list|length %}
+{% if done < steps|length %}
+<section class="card getting-started" data-getting-started>
+  <div class="gs-head">
+    <h2>Getting started <span class="muted small">{{ done }} of {{ steps|length }} done</span></h2>
+    <button type="button" class="link-btn small" data-hide-getting-started>Hide</button>
+  </div>
+  <ol class="gs-steps">
+    {% for title, ok, link, hint in steps %}
+    <li class="{{ 'done' if ok }}">
+      <span class="gs-mark" aria-hidden="true">{{ '✓' if ok else loop.index }}</span>
+      <div>{% if ok %}<strong>{{ title }}</strong>{% else %}<a href="{{ link }}"><strong>{{ title }}</strong></a>{% endif %}
+        {% if not ok %}<span class="muted small">{{ hint }}</span>{% endif %}</div>
+    </li>
+    {% endfor %}
+  </ol>
+  <p class="small muted">New here? <a href="{{ url_for('help_page') }}">Read the 2-minute guide</a>.</p>
+</section>
+{% endif %}
 
 <section class="stats stats-5">
   <a class="stat stat-found" href="{{ url_for('found', pid=project.id) }}">

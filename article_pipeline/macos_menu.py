@@ -12,6 +12,7 @@ import webbrowser
 from pathlib import Path
 from typing import Callable
 
+from . import __version__
 from .logging_setup import get_logger
 
 log = get_logger()
@@ -67,9 +68,13 @@ def run_menu_bar(url: str, on_quit: Callable[[], None], open_browser: bool = Tru
         item.button().setImage_(image)
     else:
         item.button().setTitle_("AW")
-    item.button().setToolTip_(f"Article Writer is running at {url}")
+    item.button().setToolTip_(f"Article Writer v{__version__} is running at {url}")
 
     menu = NSMenu.alloc().init()
+    header = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(f"Article Writer v{__version__}", None, "")
+    header.setEnabled_(False)
+    menu.addItem_(header)
+    menu.addItem_(NSMenuItem.separatorItem())
     entries = (("Open Article Writer", "openApp:"), ("About Article Writer", "aboutApp:"), (None, None),
                ("Quit Article Writer", "quitApp:"))
     for title, action in entries:

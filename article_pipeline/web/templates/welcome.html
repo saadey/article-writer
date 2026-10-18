@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Welcome{% endblock %}
+{% block content %}
+<div class="welcome">
+  <div class="about-hero">
+    <img src="{{ url_for('static', filename='logo.svg') }}" alt="" width="72" height="72">
+    <div>
+      <h1>Welcome to Article Writer</h1>
+      <p class="muted">Free and open source, by <a href="{{ author_url }}" target="_blank" rel="noopener">{{ author }}</a>.
+        Before you start, please read how it may be used.</p>
+    </div>
+  </div>
+  <section class="card terms-card">{% include "_terms_body.html" %}</section>
+  <form method="post" action="{{ url_for('accept_terms') }}" class="welcome-accept">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="next" value="{{ next_url }}">
+    <label class="check"><input type="checkbox" required data-accept-box> I have read and agree to these terms,
+      including the YouTube Terms of Service and Google Privacy Policy.</label>
+    <button class="btn btn-primary btn-big">Agree and continue</button>
+  </form>
+</div>
+{% endblock %}

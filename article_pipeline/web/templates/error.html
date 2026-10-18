@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ err.code }} · Article Writer{% endblock %}
+{% block title %}{{ err.code }}{% endblock %}
 {% block content %}
 <div class="empty"><h1>{{ err.code }} · {{ err.name }}</h1><p>{{ err.description }}</p>
 <p><a href="{{ url_for('home') }}">Back to the dashboard</a></p></div>

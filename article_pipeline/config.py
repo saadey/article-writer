@@ -99,9 +99,10 @@ class FilterConfig:
 
 @dataclass
 class TranscriptConfig:
-    # auto: YouTube captions first; Gemini transcribes from the video link if YouTube blocks
-    # you or the video has no captions. youtube / gemini: only that source.
-    source: str = "auto"
+    # gemini: Gemini transcribes the public video from its link (official Google API; default).
+    # auto: YouTube captions first, Gemini as fallback. youtube: captions only.
+    # Reading captions directly is an unofficial method that YouTube's terms don't permit.
+    source: str = "gemini"
     gemini_model: str = "gemini-3.5-flash-lite"
     languages: list = field(default_factory=lambda: ["en"])
     allow_auto_generated: bool = True
@@ -225,7 +226,7 @@ DEFAULT_SETTINGS = {
         "max_videos_per_run": 10,
     },
     "transcripts": {
-        "source": "auto",
+        "source": "gemini",
         "gemini_model": "gemini-3.5-flash-lite",
         "languages": ["en"],
         "allow_auto_generated": True,

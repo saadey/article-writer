@@ -128,7 +128,7 @@ Google may use prompts to improve its products, which is fine for public YouTube
 
 | Page | What it's for |
 |------|---------------|
-| **Dashboard** | **Find videos** (choose how many), counts, **Continue writing** (videos already started), **Retry failed**, live progress with a Stop button |
+| **Dashboard** | **Getting started** checklist, **Find videos** (choose how many), counts, **Continue writing** (videos already started), **Retry failed**, live progress with a Stop button |
 | **Found** | Search results with their stats, sortable (most viewed, most liked, best like ratio, biggest channels, newest...). Tick videos and click **Write selected**, or **Dismiss** them |
 | **Drafts** | Ready to publish / In progress / Published / Failed lists. Download a list as a .zip |
 | **Draft page** | Read and edit the article, **Copy formatted article** (keeps headings, bold and lists when pasted into most editors), pick a title option, check flagged claims, copy image prompts, see the transcript, rewrite, mark as published |
@@ -137,6 +137,10 @@ Google may use prompts to improve its products, which is fine for public YouTube
 | **Activity** | Every task with its full log |
 | **Projects** | One project per niche, each with its own settings, prompts and drafts. Create, copy, rename, delete |
 | **API keys** | YouTube and Gemini keys (plus an optional transcript proxy), shared by all projects |
+| **Help** | How it works, first-time setup, tips, free-tier limits and FAQs |
+
+The top bar follows the workflow: **Dashboard → Find & pick → Drafts**, with live counts. Everything else
+(Settings, Prompts, Activity, Projects, API keys, Help, About, Terms, Quit) is under **Menu**.
 
 **Workflow:**
 
@@ -155,7 +159,16 @@ Searching again only lists videos you haven't seen (found, dismissed or written 
 videos are never processed twice, failed ones wait for **Retry failed**, and anything a stopped or
 out-of-quota task didn't finish stays queued for **Continue writing**.
 
-## 5. Responsible use
+## 5. Responsible use and terms
+
+The app shows its [terms of use](article_pipeline/web/templates/_terms_body.html) on first launch (also under
+**Menu → Terms of use**). In short: it's provided as is under the MIT License; you're responsible for what you
+publish; and the YouTube Terms of Service, Google Privacy Policy and Gemini API terms apply to the services it uses.
+To follow YouTube's API policies, search results you haven't acted on are removed after 30 days and video
+statistics are erased after 30 days.
+
+This project aims to follow the licenses and terms that apply to it, but it isn't legal advice. If you build a
+business on it, have a lawyer review your use.
 
 This tool turns other people's videos into articles, so how you use it matters:
 
@@ -240,7 +253,7 @@ Every task's log is on the **Activity** page; full details are also in `logs/pip
 | `YouTube API key is not set / not valid` | Paste it again on the API keys page. |
 | `YouTube Data API v3 is not enabled` | Step 3 of "Get a YouTube API key". Wait a minute after enabling. |
 | `daily quota is used up` | Wait until midnight Pacific time, or use fewer keywords/results. |
-| `YouTube is blocking transcript requests from your IP` | With **Transcript source: Auto** (the default) Gemini transcribes instead, so you won't see this. See below. |
+| `YouTube is blocking transcript requests from your IP` | Only with a YouTube captions transcript source. Switch to **Gemini** (the default) in Settings → Transcripts. See below. |
 | `Captions are disabled` / `No transcript in languages` | Normal for some videos; they're marked failed. |
 | `All configured Gemini models have hit their free daily limit` | Wait until midnight Pacific time, then **Continue writing**. |
 | `Model '...' was not found` | Google renamed or retired it. Pick a current one from the [models page](https://ai.google.dev/gemini-api/docs/models) in Settings. |
@@ -250,11 +263,10 @@ Every task's log is on the **Activity** page; full details are also in `logs/pip
 
 **Blocked transcript requests.** YouTube captions aren't part of the official API, and YouTube blocks
 connections that look automated, especially **VPNs, cloud servers, and many requests in a short time**.
-That's why the default **Transcript source** (Settings → Transcripts) is **Auto**: it tries YouTube's
-captions first and, if YouTube blocks you or a video has no captions, Gemini watches the public video from
-its link and transcribes it (about 15 seconds per video, using Gemini free quota of up to 8 hours of video
-per day). Choose **Gemini only** to skip YouTube entirely, or **YouTube captions only** to never use Gemini
-for transcripts (then a block stops the task; wait a few hours, or add a residential proxy on the API keys page).
+That's why the default **Transcript source** (Settings → Transcripts) is **Gemini**: Gemini watches the public
+video from its link and transcribes it through Google's official API (about 15 seconds per video, free for up to
+8 hours of video a day), so YouTube blocks don't affect you. The **YouTube captions** options read captions directly,
+which is an unofficial method YouTube's terms don't permit; they're available at your own risk.
 
 **"NotOpenSSLWarning" on macOS:** harmless and already silenced.
 

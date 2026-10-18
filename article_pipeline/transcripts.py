@@ -158,7 +158,9 @@ def gemini_transcript(client, video_id: str, cfg: TranscriptConfig) -> tuple:
         {"fileData": {"fileUri": f"https://www.youtube.com/watch?v={video_id}"}, "videoMetadata": {"fps": 0.1}},
         {"text": GEMINI_TRANSCRIBE_PROMPT},
     ]
-    text, model = client.generate_text(parts, {"mediaResolution": "MEDIA_RESOLUTION_LOW", "temperature": 0})
+    text, model = client.generate_text(
+        parts, {"mediaResolution": "MEDIA_RESOLUTION_LOW", "temperature": 0, "maxOutputTokens": 65536}
+    )
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
     word_count = len(text.split())
     if word_count < cfg.min_words:

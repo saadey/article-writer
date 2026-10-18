@@ -10,6 +10,25 @@
     setTimeout(() => el.remove(), 1800);
   }
 
+  // Getting-started card: "Hide" is remembered in this browser only.
+  const gs = document.querySelector("[data-getting-started]");
+  if (gs) {
+    const key = "aw-hide-gs-" + location.pathname;
+    try { if (localStorage.getItem(key)) gs.classList.add("hidden"); } catch (e) { /* storage blocked */ }
+    gs.querySelector("[data-hide-getting-started]").addEventListener("click", () => {
+      gs.classList.add("hidden");
+      try { localStorage.setItem(key, "1"); } catch (e) { /* storage blocked */ }
+    });
+  }
+
+  // Close open menus when clicking elsewhere or pressing Escape
+  document.addEventListener("click", (e) => {
+    document.querySelectorAll("details.menu[open]").forEach((d) => { if (!d.contains(e.target)) d.open = false; });
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") document.querySelectorAll("details.menu[open]").forEach((d) => { d.open = false; });
+  });
+
   // Project switcher
   document.querySelectorAll("[data-project-switch]").forEach((sel) => {
     sel.addEventListener("change", () => { window.location = sel.value; });
@@ -100,12 +119,29 @@
   let since = logEl ? logEl.querySelectorAll("span").length : 0;
   let wasRunning = banner && banner.dataset.running === "1";
 
+  let failures = 0;
+  function showAppStopped() {
+    if (document.getElementById("app-stopped")) return;
+    const note = document.createElement("div");
+    note.id = "app-stopped";
+    note.className = "notice warn app-stopped";
+    note.textContent = "Article Writer isn't running. Open the app again, then reload this page.";
+    document.querySelector(".page").prepend(note);
+  }
+
   async function poll() {
     let job;
     try {
       const res = await fetch("/api/job?since=" + since, { cache: "no-store" });
       job = await res.json();
-    } catch (e) { return setTimeout(poll, 4000); }
+      failures = 0;
+      const note = document.getElementById("app-stopped");
+      if (note) note.remove();
+    } catch (e) {
+      failures += 1;
+      if (failures >= 2) showAppStopped();
+      return setTimeout(poll, Math.min(30000, 4000 * failures));  // back off while it's closed
+    }
     if (!job) return setTimeout(poll, 4000);
 
     const running = job.status === "running";

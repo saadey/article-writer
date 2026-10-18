@@ -190,7 +190,8 @@ def _response_text(data: dict) -> str:
         p.get("text", "") for p in (candidate.get("content") or {}).get("parts", []) if not p.get("thought")
     ).strip()
     if finish == "MAX_TOKENS":
-        raise GenerationError("Gemini's answer was cut off (too long). Try a lower writing.target_word_count.")
+        raise GenerationError("Gemini's answer was cut off because it was too long. For articles, lower the "
+                              "target length in Settings; for transcripts, the video may be too long (over ~2 hours).")
     if finish not in ("STOP", "FINISH_REASON_UNSPECIFIED") and not text:
         raise GenerationError(f"Gemini stopped without an answer (reason: {finish}).")
     return text

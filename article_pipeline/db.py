@@ -75,6 +75,11 @@ CREATE TABLE IF NOT EXISTS videos (
 );
 CREATE INDEX IF NOT EXISTS idx_videos_stage ON videos (project_id, stage, status);
 
+CREATE TABLE IF NOT EXISTS app_meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT
+);
+
 CREATE TABLE IF NOT EXISTS jobs (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id  INTEGER REFERENCES projects(id) ON DELETE CASCADE,
@@ -408,6 +413,42 @@ class Database:
 
     def delete_video(self, row_id: int) -> None:
         self._write("DELETE FROM videos WHERE id = ?", (row_id,))
+
+    # ---- app settings & data retention -------------------------------------------
+
+    def meta(self, key: str):
+        row = self.conn.execute("SELECT value FROM app_meta WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row else None
+
+    def set_meta(self, key: str, value: str) -> None:
+        self._write("INSERT INTO app_meta (key, value) VALUES (?, ?) "
+                    "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (key, value))
+
+    STAT_KEYS = ("view_count", "like_count", "comment_count", "channel_subscribers")
+
+    def expire_api_data(self, days: int = 30) -> tuple:
+        """YouTube's API policies don't allow keeping API data (like view counts) for more than 30 days
+        without refreshing it. Unreviewed search results older than that are removed (a new search can
+        find them again), and older videos keep their content but lose their statistics.
+        Returns (removed, cleared)."""
+        cutoff = datetime.fromtimestamp(datetime.now(timezone.utc).timestamp() - days * 86400,
+                                        timezone.utc).isoformat(timespec="seconds")
+        removed = self._write("DELETE FROM videos WHERE stage = 'found' AND created_at < ?", (cutoff,)).rowcount
+        rows = self.conn.execute(
+            "SELECT id, metadata_json FROM videos WHERE created_at < ? AND (view_count IS NOT NULL OR "
+            "like_count IS NOT NULL OR comment_count IS NOT NULL OR subscriber_count IS NOT NULL)", (cutoff,)
+        ).fetchall()
+        for r in rows:
+            meta = loads(r["metadata_json"], {}) or {}
+            for k in self.STAT_KEYS:
+                meta.pop(k, None)
+            self.conn.execute(
+                "UPDATE videos SET view_count = NULL, like_count = NULL, comment_count = NULL, "
+                "subscriber_count = NULL, metadata_json = ? WHERE id = ?",
+                (json.dumps(meta, ensure_ascii=False), r["id"]),
+            )
+        self.conn.commit()
+        return removed, len(rows)
 
     # ---- jobs --------------------------------------------------------------------
 

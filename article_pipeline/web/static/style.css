@@ -67,6 +67,16 @@ code { font-family: var(--mono); font-size: .9em; background: var(--surface-2); 
 .brand { font-weight: 700; color: var(--text); letter-spacing: -.01em; display: inline-flex; align-items: center; gap: .45rem; }
 .brand:hover { text-decoration: none; }
 .brand img { border-radius: 6px; display: block; }
+.brand-version { font-weight: 500; font-size: .78rem; color: var(--muted); margin-left: .15rem; }
+.nav-main { margin-right: auto; }
+.nav .count-ready { background: var(--accent-soft); color: var(--accent); }
+.main-menu { margin-left: auto; }
+.main-menu summary { display: inline-flex; align-items: center; gap: .35rem; }
+.main-menu .menu-body { min-width: 260px; }
+.menu-body hr { border: 0; border-top: 1px solid var(--border); margin: .35rem 0; }
+.menu-label { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: .35rem .6rem .15rem; }
+.menu-hint { display: block; font-size: .78rem; color: var(--muted); }
+.menu-body > a .badge { margin-left: .3rem; }
 .project-switch select { max-width: 240px; }
 .nav { display: flex; gap: .15rem; flex-wrap: wrap; }
 .nav a { color: var(--muted); padding: .35rem .6rem; border-radius: 7px; }
@@ -276,6 +286,27 @@ input[type="checkbox"] { width: auto; }
 .credits td, .credits th { padding: .45rem .9rem; }
 .license-text { max-height: none; white-space: pre-wrap; font: 12px/1.5 var(--mono); }
 
+/* ---- getting started, help, terms ---- */
+.getting-started { border-color: var(--accent); }
+.gs-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+.gs-head h2 { margin-bottom: .5rem; }
+.gs-steps { list-style: none; margin: 0 0 .5rem; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: .5rem; }
+.gs-steps li { display: flex; gap: .6rem; align-items: flex-start; padding: .6rem; border-radius: 8px; background: var(--surface-2); }
+.gs-steps li > div { display: flex; flex-direction: column; gap: .15rem; }
+.gs-mark { flex: none; width: 1.6rem; height: 1.6rem; border-radius: 50%; display: grid; place-items: center; font-weight: 700;
+  font-size: .85rem; background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
+.gs-steps li.done { opacity: .7; }
+.gs-steps li.done .gs-mark { background: var(--good-soft); color: var(--good); border-color: transparent; }
+.steps-list { padding-left: 1.2rem; margin: 0; }
+.steps-list li { margin-bottom: .6rem; }
+.faq { border-top: 1px solid var(--border); padding: .6rem 0; }
+.faq summary { cursor: pointer; font-weight: 600; }
+.faq p { margin: .5rem 0 0; }
+.terms h3 { font-size: .98rem; margin: 1.1rem 0 .35rem; }
+.terms-card { max-width: 860px; }
+.welcome { max-width: 860px; }
+.welcome-accept { display: flex; flex-direction: column; gap: .9rem; align-items: flex-start; margin: 1rem 0 2rem; }
+
 /* ---- toast ---- */
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: .5rem .9rem; border-radius: 8px; font-size: .9rem; z-index: 50; }
 
@@ -285,6 +316,8 @@ input[type="checkbox"] { width: auto; }
 }
 @media (max-width: 720px) {
   .nav-right { margin-left: 0; }
+  .nav-main { order: 3; width: 100%; margin-right: 0; }
+  .main-menu { order: 2; }
   .topbar-inner { gap: .5rem; }
   .project-switch, .project-switch select { width: 100%; max-width: none; }
   .grid-2 { grid-template-columns: 1fr; }

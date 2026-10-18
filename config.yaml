@@ -7,21 +7,17 @@
 # ============================================================
 
 niche:
-  name: "Psychology, Philosophy and Self Understanding"
+  name: "My first project"
 
 # ---- Step 1: YouTube search -----------------------------------
 search:
   # Each keyword is one YouTube search. Each search costs 100 quota
   # units per page of 50 results (free quota: 10,000 units/day).
+  # These are examples: replace them with your own niche in the app's Settings.
   keywords:
-    - "psychology of overthinking"
-    - "why we avoid hard conversations"
-    - "emotional regulation explained"
-    - "psychology of identity and self"
-    - "how to think clearly"
-    - "philosophy of the mind"
-    - "why we procrastinate psychology"
-    - "psychology of solitude and loneliness"
+    - "how to learn faster"
+    - "how to build better habits"
+    - "how to focus deeply"
 
   # Results to request per keyword (1-200). Above 50 uses extra pages
   # and extra quota.
@@ -76,7 +72,7 @@ writing:
     - gemini-3.5-flash-lite
 
   # Who you write for. Added to the instructions; leave "" to skip.
-  audience: "Thoughtful adults who want psychology and philosophy explained with depth, and who are tired of generic self help"
+  audience: "Curious, thoughtful readers who want practical ideas explained clearly"
   # Leave "" when your instructions file already describes the tone.
   tone: ""
   target_word_count: 1200

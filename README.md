@@ -139,7 +139,21 @@ Searching again only lists videos you haven't seen (found, dismissed or written 
 videos are never processed twice, failed ones wait for **Retry failed**, and anything a stopped or
 out-of-quota task didn't finish stays queued for **Continue writing**.
 
-## 5. Command line (optional)
+## 5. Responsible use
+
+This tool turns other people's videos into articles, so how you use it matters:
+
+- **Transform, don't copy.** The default prompt asks for original wording and structure, but always edit the
+  draft and add your own perspective before publishing. Don't publish drafts unedited.
+- **Fact-check.** AI can get facts wrong. Read the *Claims to check* list on every draft, and verify
+  anything health, legal or financial.
+- **Credit creators where it's fair to.** Settings → Writing → *Add source credit* adds an "Inspired by" line
+  linking the original video.
+- **Respect copyright and platform terms.** You're responsible for what you publish. Follow the copyright rules
+  where you live and the terms of YouTube, Google's Gemini API, and your publishing platform.
+- **Be open about AI help** where your platform or readers expect it.
+
+## 6. Command line (optional)
 
 Everything the app does is also available from the terminal, which is handy for scheduling:
 
@@ -159,10 +173,11 @@ python main.py import-config my-niche.yaml       # create a project from a confi
 
 `-p` can be left out when you only have one project.
 
-## 6. Project layout
+## 7. Project layout
 
 ```
 .
+├── LICENSE                    # MIT
 ├── app.py                     # start the app: python app.py (also the packaged app's entry point)
 ├── packaging/                 # PyInstaller build recipe and smoke test
 ├── .github/workflows/         # builds the Windows and Mac apps on GitHub
@@ -191,7 +206,7 @@ folder above for the downloaded app. **Back up `app.db`** to keep your drafts. T
 downloaded app, quit both, then copy `data/app.db` and `.env` into the app's data folder (`app.db` goes in its
 `data` subfolder).
 
-## 7. Troubleshooting
+## 8. Troubleshooting
 
 Every task's log is on the **Activity** page; full details are also in `logs/pipeline.log`.
 
@@ -217,3 +232,7 @@ per day). Choose **Gemini only** to skip YouTube entirely, or **YouTube captions
 for transcripts (then a block stops the task; wait a few hours, or add a residential proxy on the API keys page).
 
 **"NotOpenSSLWarning" on macOS:** harmless and already silenced.
+
+## License
+
+[MIT](LICENSE) © 2026 Saad Ali. You're free to use, change and share this project; keep the license notice.

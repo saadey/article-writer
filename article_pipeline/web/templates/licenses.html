@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Licenses · Article Writer{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{{ url_for('about') }}">About</a> /</p>
+<div class="page-head"><h1>Licenses</h1></div>
+<section class="card">
+  <h2>Article Writer</h2>
+  <pre class="log license-text">{{ license_text }}</pre>
+</section>
+<section class="card">
+  <h2>Third-party software</h2>
+  <pre class="log license-text">{{ text }}</pre>
+</section>
+{% endblock %}

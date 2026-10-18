@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Article Writer logo">
+  <rect width="512" height="512" rx="112" fill="#2f5d50"/>
+  <path d="M172 92 H298 L362 156 V398 A22 22 0 0 1 340 420 H172 A22 22 0 0 1 150 398 V114 A22 22 0 0 1 172 92 Z" fill="#fbfaf6"/>
+  <path d="M298 92 V138 A18 18 0 0 0 316 156 H362 Z" fill="#cfe3db"/>
+  <path d="M196 160 V232 L258 196 Z" fill="#e2a03f"/>
+  <rect x="196" y="276" width="120" height="18" rx="9" fill="#9db3ab"/>
+  <rect x="196" y="312" width="120" height="18" rx="9" fill="#9db3ab"/>
+  <rect x="196" y="348" width="84" height="18" rx="9" fill="#9db3ab"/>
+</svg>

@@ -1,4 +1,15 @@
-# Article Writer
+<p align="center">
+  <img src="assets/logo.svg" alt="Article Writer logo" width="96" height="96">
+</p>
+
+<h1 align="center">Article Writer</h1>
+
+<p align="center">
+  Turn YouTube videos into original, publication ready articles.<br>
+  <a href="https://github.com/saadey/article-writer/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/saadey/article-writer"></a>
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-2f5d50"></a>
+  <img alt="Windows and macOS" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-555">
+</p>
 
 A small app that finds YouTube videos in any niche, rewrites their transcripts into original,
 publication ready articles with Gemini (free tier), writes image prompts for each one, and keeps
@@ -80,8 +91,13 @@ GitHub builds both apps automatically (`.github/workflows/build-apps.yml`):
 While the repository is private, friends need to be added as collaborators (Settings → Collaborators) to download
 releases. Each build uses some of GitHub's free Actions minutes; macOS minutes count 10x.
 
-To build locally: `pip install pyinstaller` then `pyinstaller packaging/article_writer.spec`. It builds for the
-computer you run it on.
+To build locally (it builds for the computer you run it on):
+
+```bash
+pip install -r requirements-dev.txt
+python packaging/collect_licenses.py
+pyinstaller packaging/article_writer.spec
+```
 
 ## 2. Get a YouTube API key (free)
 
@@ -153,6 +169,13 @@ This tool turns other people's videos into articles, so how you use it matters:
   where you live and the terms of YouTube, Google's Gemini API, and your publishing platform.
 - **Be open about AI help** where your platform or readers expect it.
 
+### Privacy
+
+No accounts, analytics or tracking. Your projects, drafts and keys stay on your computer. The app only
+connects to the YouTube Data API (search), YouTube (captions and thumbnails) and the Google Gemini API
+(transcription and writing), using your own keys. YouTube and Gemini are trademarks of Google LLC; this
+project is independent and not affiliated with Google.
+
 ## 6. Command line (optional)
 
 Everything the app does is also available from the terminal, which is handy for scheduling:
@@ -178,8 +201,10 @@ python main.py import-config my-niche.yaml       # create a project from a confi
 ```
 .
 ├── LICENSE                    # MIT
+├── CHANGELOG.md               # what changed in each version
+├── assets/logo.svg            # the logo (icons are generated from it)
 ├── app.py                     # start the app: python app.py (also the packaged app's entry point)
-├── packaging/                 # PyInstaller build recipe and smoke test
+├── packaging/                 # build recipe, icons, license collector, smoke test
 ├── .github/workflows/         # builds the Windows and Mac apps on GitHub
 ├── main.py                    # command line: python main.py --help
 ├── config.yaml                # starter project, imported on first launch only
@@ -235,4 +260,7 @@ for transcripts (then a block stops the task; wait a few hours, or add a residen
 
 ## License
 
-[MIT](LICENSE) © 2026 Saad Ali. You're free to use, change and share this project; keep the license notice.
+[MIT](LICENSE) © 2026 [Saad Ali](https://github.com/saadey). You're free to use, change and share this project;
+keep the license notice. The downloadable apps include open-source libraries under their own licenses (listed in
+the app under **About**). Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Report security issues
+privately: see [SECURITY.md](SECURITY.md).

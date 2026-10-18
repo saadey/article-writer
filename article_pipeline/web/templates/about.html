@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}About · Article Writer{% endblock %}
+{% block content %}
+<div class="about-hero">
+  <img src="{{ url_for('static', filename='logo.svg') }}" alt="Article Writer logo" width="88" height="88">
+  <div>
+    <h1>Article Writer</h1>
+    <p class="muted">Version {{ app_version }} · Turn YouTube videos into original, publication ready articles.</p>
+    <p class="small">
+      <a href="{{ repo_url }}" target="_blank" rel="noopener">Source code</a> ·
+      <a href="{{ repo_url }}/releases" target="_blank" rel="noopener">Check for updates</a> ·
+      <a href="{{ repo_url }}/issues" target="_blank" rel="noopener">Report a problem</a>
+    </p>
+  </div>
+</div>
+
+<div class="about-grid">
+  <section class="card prose-sm">
+    <h2>Made by</h2>
+    <p><strong>{{ author }}</strong> · <a href="{{ author_url }}" target="_blank" rel="noopener">{{ author_url.replace('https://', '') }}</a></p>
+    <p>Free and open source under the <a href="{{ url_for('licenses') }}">MIT License</a>.
+      © {{ copyright_year }} {{ author }}. You may use, change and share it; keep the copyright and license notice.</p>
+    <p class="muted small">Provided "as is", without warranty of any kind. You're responsible for the articles you
+      publish: edit them, fact-check them, and respect the original creators' rights.</p>
+  </section>
+
+  <section class="card prose-sm">
+    <h2>Privacy</h2>
+    <p>No accounts, analytics or tracking. Your projects, drafts and API keys stay on this computer.</p>
+    <p>The app only connects to:</p>
+    <ul>
+      <li><strong>YouTube Data API</strong> to search for videos (with your key)</li>
+      <li><strong>YouTube</strong> to read a video's captions, and <strong>i.ytimg.com</strong> for thumbnails</li>
+      <li><strong>Google Gemini API</strong> to transcribe videos and write articles (with your key)</li>
+    </ul>
+    <p class="muted small">Those requests follow Google's terms and privacy policies. On Gemini's free tier, Google may
+      use requests to improve its products.</p>
+  </section>
+
+  <section class="card prose-sm">
+    <h2>Services</h2>
+    <ul>
+      <li><a href="https://developers.google.com/youtube/v3" target="_blank" rel="noopener">YouTube Data API v3</a>: video search and statistics</li>
+      <li><a href="https://ai.google.dev/gemini-api" target="_blank" rel="noopener">Google Gemini API</a>: transcription, articles and image prompts</li>
+    </ul>
+    <p class="muted small">YouTube and Gemini are trademarks of Google LLC. Article Writer is an independent project and
+      is not affiliated with, endorsed by, or sponsored by Google or YouTube.</p>
+  </section>
+</div>
+
+<section class="card">
+  <h2>Open-source credits</h2>
+  <p class="muted small">Article Writer is built on these projects. Thank you to their authors.
+    {% if frozen %}They are included in this app under their licenses.{% endif %}
+    <a href="{{ url_for('licenses') }}">Read the full license texts</a>.</p>
+  <div class="table-wrap">
+  <table class="table credits">
+    <thead><tr><th>Component</th><th class="hide-sm">Version</th><th>License</th></tr></thead>
+    <tbody>
+    {% for p in packages %}
+      <tr>
+        <td>{% if p.url %}<a href="{{ p.url }}" target="_blank" rel="noopener">{{ p.name }}</a>{% else %}{{ p.name }}{% endif %}</td>
+        <td class="muted small hide-sm">{{ p.version }}</td>
+        <td class="small">{{ p.license }}</td>
+      </tr>
+    {% endfor %}
+      <tr><td><a href="https://pyinstaller.org" target="_blank" rel="noopener">PyInstaller</a></td><td class="muted small hide-sm">build tool</td>
+        <td class="small">GPL-2.0 with bootloader exception (packages the downloadable app)</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endblock %}

@@ -64,7 +64,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--surface-2); 
 /* ---- top bar ---- */
 .topbar { background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
 .topbar-inner { max-width: 1180px; margin: 0 auto; padding: .55rem 16px; display: flex; align-items: center; gap: .9rem; flex-wrap: wrap; }
-.brand { font-weight: 700; color: var(--text); letter-spacing: -.01em; }
+.brand { font-weight: 700; color: var(--text); letter-spacing: -.01em; display: inline-flex; align-items: center; gap: .45rem; }
+.brand:hover { text-decoration: none; }
+.brand img { border-radius: 6px; display: block; }
 .project-switch select { max-width: 240px; }
 .nav { display: flex; gap: .15rem; flex-wrap: wrap; }
 .nav a { color: var(--muted); padding: .35rem .6rem; border-radius: 7px; }
@@ -259,6 +261,20 @@ input[type="checkbox"] { width: auto; }
 .inline-form { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
 .inline-form input, .inline-form select { width: auto; flex: 1 1 200px; }
 .inline-form label { margin: 0; }
+
+/* ---- footer + about ---- */
+.site-footer { max-width: 1180px; margin: 0 auto; padding: 1.25rem 16px 2rem; border-top: 1px solid var(--border);
+  display: flex; flex-wrap: wrap; gap: .4rem 1.25rem; color: var(--muted); font-size: .82rem; }
+.site-footer a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+.about-hero { display: flex; gap: 1.25rem; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.about-hero img { border-radius: 22%; box-shadow: var(--shadow); }
+.about-hero h1 { margin: 0; }
+.about-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; }
+.about-grid .card { margin-bottom: 0; }
+.prose-sm p, .prose-sm li { margin: 0 0 .55rem; }
+.prose-sm ul { padding-left: 1.2rem; margin: 0; }
+.credits td, .credits th { padding: .45rem .9rem; }
+.license-text { max-height: none; white-space: pre-wrap; font: 12px/1.5 var(--mono); }
 
 /* ---- toast ---- */
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: .5rem .9rem; border-radius: 8px; font-size: .9rem; z-index: 50; }

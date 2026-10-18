@@ -1,0 +1,4 @@
+# For building the downloadable apps and icons (not needed to run the app)
+-r requirements.txt
+pyinstaller>=6.10
+pillow>=10

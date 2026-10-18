@@ -9,6 +9,7 @@ browser, and adds a menu bar icon with Open and Quit.
 from __future__ import annotations
 
 import webbrowser
+from pathlib import Path
 from typing import Callable
 
 from .logging_setup import get_logger
@@ -30,13 +31,16 @@ def run_menu_bar(url: str, on_quit: Callable[[], None], open_browser: bool = Tru
     )
     from Foundation import NSObject
 
-    def show() -> None:
+    def show(path: str = "") -> None:
         if open_browser:
-            webbrowser.open(url)
+            webbrowser.open(url + path)
 
     class Delegate(NSObject):
         def openApp_(self, _sender):
             show()
+
+        def aboutApp_(self, _sender):
+            show("/about")
 
         def quitApp_(self, _sender):
             on_quit()
@@ -55,10 +59,10 @@ def run_menu_bar(url: str, on_quit: Callable[[], None], open_browser: bool = Tru
     app.setDelegate_(delegate)
 
     item = NSStatusBar.systemStatusBar().statusItemWithLength_(NSVariableStatusItemLength)
-    image = None
-    if hasattr(NSImage, "imageWithSystemSymbolName_accessibilityDescription_"):
-        image = NSImage.imageWithSystemSymbolName_accessibilityDescription_("doc.richtext", "Article Writer")
+    glyph = Path(__file__).resolve().parent / "web" / "static" / "menubar@2x.png"
+    image = NSImage.alloc().initWithContentsOfFile_(str(glyph)) if glyph.exists() else None
     if image is not None:
+        image.setSize_((18, 18))  # the file is 36px: sharp on Retina screens
         image.setTemplate_(True)
         item.button().setImage_(image)
     else:
@@ -66,7 +70,9 @@ def run_menu_bar(url: str, on_quit: Callable[[], None], open_browser: bool = Tru
     item.button().setToolTip_(f"Article Writer is running at {url}")
 
     menu = NSMenu.alloc().init()
-    for title, action in (("Open Article Writer", "openApp:"), (None, None), ("Quit Article Writer", "quitApp:")):
+    entries = (("Open Article Writer", "openApp:"), ("About Article Writer", "aboutApp:"), (None, None),
+               ("Quit Article Writer", "quitApp:"))
+    for title, action in entries:
         if title is None:
             menu.addItem_(NSMenuItem.separatorItem())
             continue

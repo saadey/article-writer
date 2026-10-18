@@ -17,6 +17,7 @@ from ..config import (
     APP_PORT_FILE, DB_PATH, FROZEN, KEY_NAMES, ConfigError, build_settings, default_prompt, load_keys, save_keys,
     settings_to_dict,
 )
+from .. import AUTHOR, AUTHOR_URL, COPYRIGHT_YEAR, REPO_URL, __version__
 from ..db import Database, loads
 from ..export import article_markdown, draft_files, zip_drafts
 from ..logging_setup import get_logger
@@ -85,6 +86,11 @@ def create_app() -> Flask:
         project = getattr(g, "project", None)
         return {
             "csrf_token": csrf_token,
+            "app_version": __version__,
+            "author": AUTHOR,
+            "author_url": AUTHOR_URL,
+            "repo_url": REPO_URL,
+            "copyright_year": COPYRIGHT_YEAR,
             "asset_version": asset_version,
             "projects": g.db.projects() if "db" in g else [],
             "project": project,
@@ -210,6 +216,20 @@ def create_app() -> Flask:
             return jsonify(ok=True)
         flash("Stopping after the current step.", "ok")
         return redirect(request.referrer or url_for("home"))
+
+    @app.get("/about")
+    def about():
+        if session.get("project_id"):
+            g.project = g.db.project(session["project_id"])
+        from ..licenses import summary
+        return render_template("about.html", packages=summary(), frozen=FROZEN)
+
+    @app.get("/about/licenses")
+    def licenses():
+        if session.get("project_id"):
+            g.project = g.db.project(session["project_id"])
+        from ..licenses import full_text
+        return render_template("licenses.html", text=full_text(), license_text=_own_license())
 
     @app.get("/api/ping")
     def ping():
@@ -496,6 +516,12 @@ def _mask(value) -> str:
     if not value:
         return ""
     return "•" * 6 + value[-4:] if len(value) > 10 else "•" * 6
+
+
+def _own_license() -> str:
+    from ..config import RESOURCE_ROOT
+    path = RESOURCE_ROOT / "LICENSE"
+    return path.read_text(encoding="utf-8") if path.exists() else "MIT License"
 
 
 def _compact(n) -> str:

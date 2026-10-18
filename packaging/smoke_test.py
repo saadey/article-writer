@@ -12,6 +12,7 @@ import urllib.request
 
 PORT = 8765
 PAGES = ["/", "/p/1/", "/p/1/found", "/p/1/drafts", "/p/1/settings", "/p/1/prompts", "/keys", "/projects",
+         "/about", "/about/licenses", "/static/logo.svg",
          "/static/style.css", "/static/app.js"]
 
 
